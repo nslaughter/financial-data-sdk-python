@@ -1,4 +1,4 @@
-# Financial data SDK
+# Financial data SDK for Python
 
 A Python SDK demonstration for financial research: retrieve the data available
 at a chosen cutoff, resume an interrupted download, and keep the versions an
@@ -11,9 +11,10 @@ depend on. This project will make that approach inspectable through a small
 research workflow.
 
 **Status:** Project brief. This repository currently contains this README.
-The SDK, fixture-backed demo API, tests, and runnable examples are planned;
-nothing described here has been implemented or tested yet. The dataset is
-synthetic, and this is a demonstration project, not client work.
+The SDK, tests, and runnable examples are planned; nothing described here has
+been implemented or tested yet. The demo API and the shared data contract live
+in [financial-data-api](https://github.com/nslaughter/financial-data-api). The dataset is synthetic, and this is a
+demonstration project, not client work.
 
 ## What this project demonstrates
 
@@ -34,15 +35,18 @@ partway through. It is meant to show:
   invalid input, throttling, and transient errors are distinguishable from one
   another and from an empty result. Retries are bounded.
 - **Examples that act as release checks.** CI builds the package, installs it
-  outside the source tree, and runs the examples on each supported Python
-  version before a tagged release.
+  outside the source tree, and runs the examples and the shared contract's
+  checks on each supported Python version before a tagged release.
 
-The SDK is the first of four stages in a demonstration for financial data
-providers. The [financial-data-api](https://github.com/nslaughter/financial-data-api)
-expands the server side, the
+This SDK opens the first of four stages in a demonstration for financial data
+providers. SDKs in [Go](https://github.com/nslaughter/financial-data-sdk-go)
+and [TypeScript](https://github.com/nslaughter/financial-data-sdk-ts) follow
+it, covering the same workflow and passing the same checks against the same
+demo API. The [financial-data-api](https://github.com/nslaughter/financial-data-api) supplies that demo API from the start
+and expands it in the second stage, the
 [financial-data-api-monitor](https://github.com/nslaughter/financial-data-api-monitor)
 checks what customers receive from it, and a final migration stage makes a
-deliberate contract change to this SDK and the API.
+deliberate contract change to the SDKs and the API.
 
 ## A successful download should leave the researcher able to explain the result
 
@@ -60,13 +64,13 @@ belong in the SDK's design and examples.
 ## How the first demonstration will work
 
 1. Install the built Python distribution in a clean environment and start the
-   small fixture-backed API included in this repository. The demonstration
-   needs no external data credentials.
+   demo API from the container image that financial-data-api publishes, at a
+   pinned version. The demonstration needs no external data credentials.
 2. Retrieve the observations available at a chosen cutoff, retaining their
    observation and revision identities.
 3. Interrupt a paginated download, resume from its saved checkpoint, and
-   compare the local records with expectations prepared separately from the
-   client.
+   compare the local records with the expected results in the shared data
+   contract, which were prepared before any client code.
 4. Follow subsequent releases, revisions, and withdrawals through an update
    cursor while retaining the versions needed to reproduce the earlier
    analysis.
@@ -122,18 +126,18 @@ which version the provider could deliver by the cutoff, so the query returns
 
 The first release covers one synthetic dataset and the research workflow above:
 authentication, typed records, pagination, errors, bounded retries, resumable
-downloads, and update following. The demo API implements only what that
-workflow needs.
+downloads, and update following. At this stage the demo API implements only
+what that workflow needs.
 
-The expanded API, bulk exports, additional languages, and hosted deployment
-are outside this release. Python suits the research example; it does not limit
-the languages I work in for SDK engagements.
+The expanded API, bulk exports, and hosted deployment are outside this release.
+Python suits the research example; the Go and TypeScript SDKs cover the same
+workflow in their own repositories.
 
 ## The demonstration is complete when
 
 - The built package installs in a clean environment and the documented
-  workflow runs against the demo API, matching independently prepared
-  expectations.
+  workflow runs against the pinned demo API, passing the shared contract's
+  checks for this stage.
 - Authentication and rate-limit errors are reported distinctly, and retries
   stop within their configured bounds.
 - An interrupted paginated download resumes with no missing or duplicate
@@ -145,10 +149,10 @@ the languages I work in for SDK engagements.
 - A customer-focused README and quickstart.
 - A runnable research example or notebook, and a scheduled-job example that
   checkpoints and resumes.
-- A documented data contract for the fixture dataset.
-- The fixture-backed demo API and the separately prepared expected results.
-- CI that builds the distribution, installs it, and runs the examples on each
-  supported Python version.
+- Type documentation mapped to the shared data contract.
+- CI that builds the distribution, installs it, and runs the examples and the
+  contract's checks against the pinned demo API image on each supported Python
+  version.
 - A tagged release with an installable distribution.
 - Documented limitations and a clear demonstration label.
 
@@ -165,8 +169,11 @@ different data model.
 
 ## Related projects and writing
 
-- [financial-data-api](https://github.com/nslaughter/financial-data-api):
-  the full API this SDK will act as a customer of.
+- [financial-data-sdk-go](https://github.com/nslaughter/financial-data-sdk-go)
+  and [financial-data-sdk-ts](https://github.com/nslaughter/financial-data-sdk-ts):
+  the same client in Go and TypeScript.
+- [financial-data-api](https://github.com/nslaughter/financial-data-api): the demo API, the shared data contract, and the
+  full API this SDK will act as a customer of.
 - [financial-data-api-monitor](https://github.com/nslaughter/financial-data-api-monitor):
   scheduled customer-level checks against that API.
 - *Building an SDK your customers love*: an article on the design behind this
