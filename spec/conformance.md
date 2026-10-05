@@ -189,8 +189,9 @@ added. Its action is one of these:
 | `rewrite` | Forwards the request, then answers with the API's response, its body parsed, changed by the given function, and serialized again. |
 
 The proxy records every request it receives (method, path, query, headers,
-and arrival time on a monotonic clock) and every response it returns
-(status and headers). Scenarios check those records. A scenario starts by
+and arrival time on a monotonic clock), every response it returns (status
+and headers), and when, on the same clock, each connection it accepts
+opens and closes. Scenarios check those records. A scenario starts by
 clearing the rules and the records and resetting the API directly, not
 through the proxy.
 
@@ -496,7 +497,9 @@ releases its connections when the block ends.
 2. Take 10 records from `it`. Requests: 1.
 3. Take one more record. Requests: 1 more.
 4. Call `it.close()`. Requests: none.
-5. Leave the `with` block. Then `client.series.list()` raises
+5. Leave the `with` block. A connection the proxy accepted was still open
+   when the block ended, and within 1 s every connection it accepted in
+   the scenario is closed. Then `client.series.list()` raises
    `ClientClosedError`. Requests: none.
 
 #### `snapshot-kept-across-a-revision`
@@ -823,7 +826,7 @@ cutoff up to its last sync.
 | Observation and revision identities, periods, availability times, decimal values, units, and missing values survive the client | Every query check (shared), through the [conversion](#converting-a-result); `responses-are-validated`, `dataframe-keeps-revision-information` |
 | Denied access, invalid credentials, invalid input, throttling, and transient errors are distinguishable from one another and from an empty result | `refusals-are-not-retried`, `access-revoked-during-iteration`, `error-bodies-the-api-did-not-write`, `throttled-on-every-attempt`, `transient-errors-then-success` |
 | Revoking access, forcing throttling beyond the retry budget, and a revision during a download (demonstration step 5) | `access-revoked-during-iteration`, `throttled-on-every-attempt`, `snapshot-kept-across-a-revision` |
-| The caller controls concurrency and cleanup | `iteration-is-lazy` |
+| The caller controls concurrency and cleanup | `iteration-is-lazy`; leaving the block normally, by an exception, and after an iterator stopped early, in plan step 4's unit tests |
 | Pages and tokens are available alongside a record iterator, and a job saves both in one transaction | `resume-after-interrupted-download`, `scheduled-job-resumes`; that a failure between a page's revisions and its checkpoint saves neither, in plan step 10's tests, since these scenarios fail only between transactions |
 | Pagination stays on one snapshot; an expired snapshot is reported as requiring a restart | `snapshot-kept-across-a-revision`, `pages-must-share-a-snapshot`, `resume-after-snapshot-expiry` |
 | `Retry-After` in both forms; the caller's deadline covers retry waits and bounds each wait on the network; only safe reads are retried | `retry-after-seconds`, `retry-after-http-date`, `retry-after-invalid`, `deadline-during-request`, `deadline-during-slow-body`, `deadline-bounds-backoff`; only `GET` exists at stage 1 |

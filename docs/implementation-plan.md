@@ -272,7 +272,12 @@ Out of scope: the endpoints.
   - an empty result raises nothing, and neither does an empty caught-up
     change page, whose `next_position` is the position it read from;
   - `ClientClosedError` after `close()`, through a derived client, and
-    through a supplied client the caller closed.
+    through a supplied client the caller closed;
+  - the `httpx.Client` the SDK created is closed after `close()` and after
+    leaving the `with` block normally, by an exception, and after an
+    iterator stopped early, checked through a subclass that records its
+    instances and replaces `httpx.Client` in the test; closing a derived
+    client leaves it open.
 
 Out of scope: running against the API.
 
@@ -308,7 +313,8 @@ Follows D3 for the proxy and D5 for reading the vendored contract.
   It takes `--base-url` and `--stage`, both required.
 - In `tests/faults`, implement
   [The fault proxy](../spec/conformance.md#the-fault-proxy): rules, the
-  six actions, the records, and the `Retry-After` date helper.
+  six actions, the records of requests, responses, and connections, and
+  the `Retry-After` date helper.
 - In `tests/scenarios`, the harness: the profile; `enabled.txt`, checked
   against the headings under **Scenarios** in `spec/conformance.md` and
   against the tests; and the proxy started in front of `--base-url`.
