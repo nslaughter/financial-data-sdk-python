@@ -760,13 +760,35 @@ reproduced. This is the README's demonstration, step 4.
    `--as-of 2025-06-21T00:00:00Z`, and `rev_may25_3` with `100.1` at
    `--as-of 2025-07-03T12:31:10Z`.
 
+#### `scheduled-job-starts-empty`
+
+A job first run before the series has any revision loads nothing. Every
+revision then comes from the change stream, so the copy answers every
+cutoff up to its last sync.
+
+- **Clock:** `2024-01-01T00:00:00Z`, before the first revision.
+
+1. `sync` exits with status 0. The database holds no revisions, and
+   `status` shows the stage `following`, position 0, no `complete_from`,
+   and `synced_at` `2024-01-01T00:00:00Z`.
+2. Set the clock to `2024-02-03T12:31:10Z`, when `rev_jan24_1` becomes
+   available.
+3. `sync` exits with status 0 at position 1, having saved `rev_jan24_1`.
+   `status` still shows no `complete_from`, and `synced_at`
+   `2024-02-03T12:31:10Z`.
+4. `query --as-of 2024-01-15T00:00:00Z` exits with status 0 and prints no
+   lines.
+5. `query --as-of 2024-02-03T12:31:10Z` prints `rev_jan24_1` with `97.1`.
+6. `query --as-of 2024-03-01T00:00:00Z` exits with a non-zero status and
+   names the range it can answer.
+
 ## Coverage
 
 ### The README's completion criteria
 
 | Criterion | Checks and scenarios |
 | --- | --- |
-| The built package installs in a clean environment, and the documented workflow runs against the pinned demo API and passes the shared contract's checks | The stage 1 shared checks, run from the installed wheel by plan step 12's release workflow; `research-example`, `scheduled-job-resumes`, `scheduled-job-follows-updates` |
+| The built package installs in a clean environment, and the documented workflow runs against the pinned demo API and passes the shared contract's checks | The stage 1 shared checks, run from the installed wheel by plan step 12's release workflow; `research-example`, `scheduled-job-resumes`, `scheduled-job-follows-updates`, `scheduled-job-starts-empty` |
 | Authentication and rate-limit errors are reported distinctly | `access-control` (shared), `refusals-are-not-retried`, `access-revoked-during-iteration`, `throttled-on-every-attempt`, `retry-after-beyond-budget` |
 | Retries stop within their configured bounds | `throttled-on-every-attempt`, `server-error-exhausts-attempts`, `connection-dropped-every-attempt`, `retry-after-beyond-budget`, `retry-after-beyond-deadline`, `deadline-during-request`, `deadline-bounds-backoff`; jitter in plan step 3's unit tests, since one run cannot show a random wait |
 | An interrupted paginated download resumes with no missing or duplicate records | `resume-after-interrupted-download`, `scheduled-job-resumes` |
@@ -794,7 +816,7 @@ These are proposed with this draft and take effect when the operator
 approves it.
 
 1. **The SDK scenarios are prose matched to tests by name, not a notation
-   the harness parses.** There are 31, each a few calls against a real
+   the harness parses.** There are 32, each a few calls against a real
    API. A parsed notation, like the Polymarket client's, would cost more
    than the drift it prevents. A reviewer compares each test with its
    scenario, and the harness checks that names and headings agree.

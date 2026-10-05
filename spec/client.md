@@ -631,10 +631,11 @@ query, follows the change stream, and answers cutoff queries offline.
 2. **Loading.** Without a saved page token, it starts the query, without a
    cutoff, from its first page; with one, it resumes from the token. For
    each page, one transaction saves the page's revisions, its
-   `next_page_token`, the snapshot position, and the latest `available_at`
-   among the revisions this load has saved. After the last page, the stage
-   becomes `following`, at the query's position. A query without a cutoff
-   matches the state at its position, so the stream continues from there
+   `next_page_token`, the snapshot position, and `complete_from`: the
+   latest `available_at` among the revisions this load has saved, or null
+   while it has saved none. After the last page, the stage becomes
+   `following`, at the query's position. A query without a cutoff matches
+   the state at its position, so the stream continues from there
    ([positions][api-positions]).
    If the saved token has expired (`PageTokenExpiredError`), the load
    restarts from the first page. Rows already saved stay, because a
@@ -667,9 +668,13 @@ answers a cutoff exactly from `complete_from`, the latest `available_at`
 among the records the load saved. From that instant, every loaded record is
 available, and each outranks every revision the load left out of its
 observation, while revisions after the snapshot position come from the
-stream. It answers exactly up to `synced_at`, the API's time before the
-last catch-up began. `query` refuses a cutoff outside that range, names the
-range, and suggests asking the API.
+stream. A load that saved nothing left nothing out: the series had no
+revision at or below the snapshot position, so every revision comes from
+the stream. Its `complete_from` is null, and the copy answers every cutoff
+up to `synced_at`. Following the stream never changes `complete_from`;
+only a new load does. The copy answers exactly up to `synced_at`, the
+API's time before the last catch-up began. `query` refuses a cutoff
+outside that range, names the range, and suggests asking the API.
 
 In the fixture, a load that runs after the August 2026 release became
 available, at 12:31:10 on September 3, and before its revision did, at
@@ -677,6 +682,9 @@ available, at 12:31:10 on September 3, and before its revision did, at
 copy still answers the September 4 cutoff with 102.4 after it has followed
 the revision to 102.1. A copy first loaded after the revision has
 `complete_from` on September 10, and the September 4 cutoff needs the API.
+A copy first loaded before `2024-02-03T12:31:10Z`, when the first revision
+became available, saves nothing, and once it has followed the stream it
+answers every cutoff up to its `synced_at`.
 
 ## Packaging (D4, D8)
 

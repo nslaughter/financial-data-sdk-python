@@ -352,11 +352,12 @@ Follows D2 and D6. Waits for the same image as step 8.
 - Tests without the API: load every fixture revision into the
   scheduled-job example's store, and run each query check in
   `contract/expected/` against its offline selection. Each result must
-  match. Test `complete_from` and the refusal of cutoffs outside the
-  range.
-- Turn on `research-example`, `scheduled-job-resumes`, and
-  `scheduled-job-follows-updates`. CI runs them from a clean virtual
-  environment with the wheel and its `pandas` extra.
+  match. Test `complete_from`, including the null one of a load that saved
+  nothing, and the refusal of cutoffs outside the range.
+- Turn on `research-example`, `scheduled-job-resumes`,
+  `scheduled-job-follows-updates`, and `scheduled-job-starts-empty`. CI
+  runs them from a clean virtual environment with the wheel and its
+  `pandas` extra.
 
 ### 11. Check request IDs against contract 0.4.0
 
