@@ -988,16 +988,15 @@ URL.
 - **Bounding a slow response by the deadline.** httpx's timeouts bound each
   socket operation, not a whole request: with httpx 0.28.1, a 1-second
   timeout let a body sent one byte every 0.4 seconds run 2.5 seconds, and
-  headers sent the same way run past it too ([Deadline](#deadline)). The
-  options include a watchdog that closes the connection at the deadline,
-  which needs a thread and reaches the socket only through httpcore's
-  extensions; a deadline-aware network backend for the SDK's own client,
-  which imports httpcore beside httpx (D1) and does not cover a caller's
-  client; and promising less: each socket operation lasts at most the time
-  remaining when the attempt began, and the deadline is also checked
-  between chunks of the body.
-  Plan step 3 waits for the choice, and scenarios for slow headers and a
-  slow body come with it.
+  headers sent a byte at a time ran past it too ([Deadline](#deadline)).
+  The options include a watchdog that closes the connection at the
+  deadline, which needs a thread and reaches the socket only through
+  httpcore's extensions; a deadline-aware network backend for the SDK's
+  own client, which imports httpcore beside httpx (D1) and does not cover
+  a caller's client; and promising less: each socket operation lasts at
+  most the time remaining when the attempt began, and the deadline is also
+  checked between chunks of the body. Plan step 3 waits for the choice,
+  and scenarios for slow headers and a slow body come with it.
 - **Stage 2.** When `published_as_of`, the revision history, the release
   calendar, and exports enter the SDK, and whether they change its record
   types.
