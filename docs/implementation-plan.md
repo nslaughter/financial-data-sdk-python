@@ -221,7 +221,8 @@ Out of scope: the endpoints.
     [Public interface](../spec/client.md#public-interface) table.
 - Iterators fetch lazily and keep the pagination guarantees in
   [Pagination](../spec/client.md#pagination):
-  - one snapshot position per query, and no repeated token;
+  - one snapshot position per query, and no token sent twice, whether a
+    page returns its own token or a cycle passes through several pages;
   - the change stream's progress, stopping once caught up and returning at
     least one page.
 - Tests use `httpx.MockTransport` with responses built from the vendored

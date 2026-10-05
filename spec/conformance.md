@@ -445,8 +445,8 @@ whose unchanged answer is `rev_aug26_2`. Each step sends 1 request.
 
 #### `pages-must-share-a-snapshot`
 
-`pages()` refuses a page that would mix two snapshots or repeat itself,
-instead of returning it.
+`pages()` refuses a page that would mix two snapshots or lead back to a page
+it has already read, instead of returning it.
 
 1. Add `rewrite` on request 2 of `GET /v1/observations`, setting
    `position` to 38. `client.observations.pages("activity-index", page_size=10)`
@@ -457,7 +457,12 @@ instead of returning it.
    the request sent. The same iteration returns its first page, then
    raises `UnexpectedResponseError` instead of returning the second.
    Requests: 2.
-3. Clear the rules, and add `rewrite` on request 1 of
+3. Clear the rules, and add `rewrite` on request 3 of
+   `GET /v1/observations`, setting `next_page_token` to the `page_token`
+   request 2 sent, which leads back to the second page. The same iteration
+   returns its first two pages, then raises `UnexpectedResponseError`
+   instead of returning the third. Requests: 3.
+4. Clear the rules, and add `rewrite` on request 1 of
    `GET /v1/datasets/core-indicators/changes`, setting `data` to `[]` and
    `next_position` to 0, and leaving `head_position` 37. The API's answer
    holds all 37 revisions with `next_position` 37, so the rewritten page is

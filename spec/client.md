@@ -302,9 +302,12 @@ The only exceptions are the two guarantees pagination depends on
   ([pagination][api-pagination]), and `pages()` never sends one.
 - `iterate()` returns the records of `pages()`, in order.
 - Every page of one query has the same snapshot `position`. If a later page
-  reports a different position, or returns the token it was sent as its
-  `next_page_token`, `pages()` raises `UnexpectedResponseError`. It never
-  mixes two states or loops forever ([decision 10](#decisions)).
+  reports a different position, or returns as its `next_page_token` any
+  token the iterator has already sent, including the `page_token` it
+  started from, `pages()` raises `UnexpectedResponseError`. The iterator
+  keeps the tokens it has sent for this check, so it never mixes two states
+  or loops forever, even through a cycle of several pages
+  ([decision 10](#decisions)).
 
 ### Resuming a query
 
