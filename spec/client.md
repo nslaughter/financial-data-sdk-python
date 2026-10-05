@@ -466,9 +466,11 @@ one of these holds:
 - the next wait would end at or after its deadline.
 
 A `Retry-After` longer than the remaining budget or deadline therefore
-raises `RateLimitError` at once, with `retry_after` set, instead of sleeping
-and then failing. A caller with a longer horizon, such as a scheduled job,
-can wait that long itself and try again ([decision 12](#decisions)).
+raises the exception of the attempt that carried it at once, with
+`retry_after` set, instead of sleeping and then failing: `RateLimitError`
+for a `429`, and `ServerError` for a `5xx` such as `503`. A caller with a
+longer horizon, such as a scheduled job, can wait that long itself and try
+again ([decision 12](#decisions)).
 
 ### Deadline
 

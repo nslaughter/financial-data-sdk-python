@@ -201,6 +201,8 @@ Follows D1 for the HTTP client and D7 for reading `Request-Id`.
 - Tests use `httpx.MockTransport`, with the clock, the sleep, and the
   random source passed in:
   - each row of the retry table, and each bound;
+  - a `Retry-After` beyond the budget on a `429` and on a `503`, which
+    raise `RateLimitError` and `ServerError`, each with `retry_after` set;
   - jitter stays within its bounds and uses the random source;
   - `Retry-After` in each form;
   - the deadline passing during a request, and before a wait;
