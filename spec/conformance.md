@@ -459,7 +459,9 @@ instead of returning it.
    Requests: 2.
 3. Clear the rules, and add `rewrite` on request 1 of
    `GET /v1/datasets/core-indicators/changes`, setting `data` to `[]` and
-   leaving `next_position` 0 and `head_position` 37.
+   `next_position` to 0, and leaving `head_position` 37. The API's answer
+   holds all 37 revisions with `next_position` 37, so the rewritten page is
+   not caught up and makes no progress.
    `client.changes.pages("core-indicators", after=0)` raises
    `UnexpectedResponseError`. Requests: 1.
 
