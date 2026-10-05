@@ -442,7 +442,7 @@ in [Credentials and logging](#credentials-and-logging) does not cover it.
 | `problem` | `APIError` | The whole problem body as a read-only mapping, with the key redacted ([Credentials and logging](#credentials-and-logging)), or `None`. |
 | `retry_after` | `APIError` | The seconds the response's `Retry-After` asked for, or `None` ([Waiting](#waiting)). |
 | `request_id` | `APIError`, `UnexpectedResponseError` | The response's `Request-Id` header, or `None` (D7). |
-| `method`, `path` | `APIError`, `TransportError`, `DeadlineExceededError`, `UnexpectedResponseError` | The request's method, and its path with the query string, as sent. |
+| `method`, `path` | `APIError`, `TransportError`, `DeadlineExceededError`, `UnexpectedResponseError` | The request's method, and its path with the query string, as sent, except that an argument holding the key is `[redacted]` ([Credentials and logging](#credentials-and-logging)). |
 | `attempts` | `APIError`, `TransportError`, `DeadlineExceededError`, `UnexpectedResponseError` | How many requests the call sent, retries included. |
 
 `str(error)` reads like
@@ -612,6 +612,15 @@ hard bound runs the call where it can abandon it, such as another thread.
   `detail`, `parameter`, `problem`, and `str(error)`; in `Request-Id`; and
   in anything else taken from the response. Keeping the key out comes
   before keeping the response's text exact.
+- A request can hold the key too, when the caller passes it, or text that
+  contains it, as an argument, as in `client.series.get(key)` by mistake.
+  The SDK reports a request with `[redacted]` in place of each path segment
+  and query value whose text, before percent-encoding, contains the key: in
+  `path`, and so in `str(error)`, and in its log records. Whenever it
+  catches an `httpx.HTTPError`, it also gives the request of every httpx
+  exception reachable from it through `__cause__` and `__context__`, itself
+  included, the URL with the same replacements. Keeping the key out comes
+  before reporting the request exactly as sent.
 - An exception the caller's own code raises, such as one from an event
   hook on a client the caller supplied, propagates unchanged
   ([Exceptions from httpx](#exceptions-from-httpx)), and the promises
@@ -632,7 +641,9 @@ hard bound runs the call where it can abandon it, such as another thread.
   They do log what a response sends before the SDK sees it: httpx its
   status line at `INFO`, and httpcore its status line and headers at
   `DEBUG`. A response that echoes the key there, as a gateway's might,
-  puts it in their records.
+  puts it in their records. httpx also logs each request's URL at `INFO`
+  once its response arrives, so a key passed as an argument reaches
+  httpx's records.
 
 ## Supplying an HTTP client (D1)
 
@@ -908,11 +919,12 @@ it. Each can be revisited in a later version.
     throttling.
 13. **The key is redacted from httpx's chained exceptions, which are
     kept.** The chain keeps the transport detail a support engineer needs.
-    The request it holds carries the header, and its message can quote the
-    response, so the SDK redacts the key in both rather than dropping the
-    cause. An `httpx.HTTPStatusError`, or an error from parsing or
-    validating a body, is left out instead: it holds the response or its
-    body, and adds nothing a caller acts on to the SDK's exception.
+    The request it holds carries the header, and its URL any key the
+    caller passed as an argument; its message can quote the response. The
+    SDK redacts the key in all three rather than dropping the cause. An
+    `httpx.HTTPStatusError`, or an error from parsing or validating a body,
+    is left out instead: it holds the response or its body, and adds
+    nothing a caller acts on to the SDK's exception.
 14. **The SDK has no test-control methods.** Test control belongs to the
     demo API, not to customers. The conformance runner and the scenarios
     call `/test` over HTTP.

@@ -612,9 +612,9 @@ A position past retention is reported as needing a fresh load.
 
 #### `key-absent-from-errors-and-logs`
 
-The key appears in no error, representation, or record the SDK logs, and
-the libraries under the SDK log no request header, while every request
-still carries it.
+The key appears in no error, representation, or record the SDK logs, even
+when a caller passes it as an argument, and the libraries under the SDK
+log no request header, while every request still carries it.
 
 - Logging: every record at `DEBUG` and above, from every logger, is
   captured.
@@ -639,23 +639,31 @@ still carries it.
    `client.series.list()` raises `AuthenticationError` with `detail`
    `Bearer [redacted] is not valid.` and `request_id` `[redacted]`. Clear
    the rules.
-7. For each exception raised above, `demo-research-key` does not occur in
+7. Add `drop` on every `GET /v1/series/demo-research-key`.
+   `client.series.get("demo-research-key")`, which passes the key as an
+   argument by mistake, raises `TransportError` with `path`
+   `/v1/series/[redacted]`. Clear the rules.
+8. `client.series.get("demo-research-key")` raises `NotFoundError` with
+   `path` `/v1/series/[redacted]`.
+9. For each exception raised above, `demo-research-key` does not occur in
    its `str`, its `repr`, the `repr` of its `args` and of each attribute
    the client contract lists, or `traceback.format_exception` of it.
    Following its `__cause__` and `__context__` to the end of the chain,
    the key does not occur in the `repr` of any exception's `args`, and
    every httpx exception that holds a request has
-   `Authorization: Bearer [redacted]` on it. The chains of the
-   `TransportError`, which follows three dropped connections, and of the
-   `DeadlineExceededError` hold at least one such request.
-8. `demo-research-key` occurs in no message, arguments, or attributes of
-   a captured record from `financial_data`, and not in `repr(client)`. The
-   captured records include two `INFO` retry records from step 3. A
-   captured record from another logger holds the key only if it comes
-   from `httpcore` during step 6, whose response echoes the key in a
-   header ([credentials and logging](client.md#credentials-and-logging)).
-9. Every request the proxy received carried
-   `Authorization: Bearer demo-research-key`.
+   `Authorization: Bearer [redacted]` on it and a URL without the key. The
+   chains of the two `TransportError` exceptions, each of which follows
+   three dropped connections, and of the `DeadlineExceededError` hold at
+   least one such request.
+10. `demo-research-key` occurs in no message, arguments, or attributes of
+    a captured record from `financial_data`, and not in `repr(client)`.
+    The captured records include two `INFO` retry records from step 3. A
+    captured record from another logger holds the key only if it comes
+    from `httpcore` during step 6, whose response echoes the key in a
+    header, or from `httpx` during step 8, which logs the request's URL
+    ([credentials and logging](client.md#credentials-and-logging)).
+11. Every request the proxy received carried
+    `Authorization: Bearer demo-research-key`.
 
 #### `custom-http-client`
 
@@ -831,7 +839,7 @@ cutoff up to its last sync.
 | Pages and tokens are available alongside a record iterator, and a job saves both in one transaction | `resume-after-interrupted-download`, `scheduled-job-resumes`; that a failure between a page's revisions and its checkpoint saves neither, in plan step 10's tests, since these scenarios fail only between transactions |
 | Pagination stays on one snapshot; an expired snapshot is reported as requiring a restart | `snapshot-kept-across-a-revision`, `pages-must-share-a-snapshot`, `resume-after-snapshot-expiry` |
 | `Retry-After` in both forms; the caller's deadline covers retry waits and bounds each wait on the network; only safe reads are retried | `retry-after-seconds`, `retry-after-http-date`, `retry-after-invalid`, `deadline-during-request`, `deadline-during-slow-body`, `deadline-bounds-backoff`; a chunked body whose framing arrives slowly, in plan step 3's unit tests; only `GET` exists at stage 1 |
-| Errors carry the provider's request ID and omit the credential | `request-id-from-any-response`, `request-id-from-the-api`, `key-absent-from-errors-and-logs`; a malformed key's `ConfigError` in plan step 1's tests; the key in a hook's `httpx.HTTPStatusError`, in the message of a response httpx could not parse, and in a body that does not parse as JSON, in plan step 3's tests |
+| Errors carry the provider's request ID and omit the credential | `request-id-from-any-response`, `request-id-from-the-api`, `key-absent-from-errors-and-logs`; a malformed key's `ConfigError` in plan step 1's tests; the key in a hook's `httpx.HTTPStatusError`, in the message of a response httpx could not parse, in a body that does not parse as JSON, and in an argument whose percent-encoding changes it, in plan step 3's tests |
 | Customers can supply their own transport | `custom-http-client`; the SDK runner's recording client |
 | Logging without global handlers | Plan step 3's unit tests; `key-absent-from-errors-and-logs` |
 | Dataframe support is optional and keeps revision information | `dataframe-keeps-revision-information`; plan step 5's test without pandas |

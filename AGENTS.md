@@ -85,9 +85,12 @@ The README describes the project for people; it is not a specification.
   chain, itself included, not only the direct cause, and replace the key
   with `[redacted]` in every string in the `args` of every exception in
   that chain, where httpx, httpcore, and h11 quote a response they could
-  not parse. Raise for an `httpx.HTTPStatusError`, or for a body that does
-  not parse or validate, outside the `except` block, so that no chain
-  holds the response or its body. Replace the key with `[redacted]` in
+  not parse. A caller can pass the key as an argument, so report a
+  request's path, and set the URL of each of those requests, with
+  `[redacted]` in place of any path segment or query value whose text
+  contains the key. Raise for an `httpx.HTTPStatusError`, or for a body
+  that does not parse or validate, outside the `except` block, so that no
+  chain holds the response or its body. Replace the key with `[redacted]` in
   any text taken from a response, such as a problem body or `Request-Id`,
   before an exception or a log record holds it. Let an exception the
   caller's code raises propagate unchanged. Tests search every rendering

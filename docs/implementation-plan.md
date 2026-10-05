@@ -212,6 +212,9 @@ how the deadline bounds a slow response.
   - `attempts` and `request_id` on every exception that has them;
   - the key replaced with `[redacted]` in any text taken from a response,
     before an exception or a log record holds it;
+  - `[redacted]` in place of each path segment and query value whose text
+    contains the key, in `path`, `str`, the log records, and the URL of
+    the request of every httpx exception in the chain;
   - the three request headers;
   - no redirect followed, through the SDK's own client or a supplied one;
   - a supplied client's settings, `auth` replaced, never closed, and
@@ -273,6 +276,11 @@ how the deadline bounds a slow response.
   - a response that echoes the key, in a problem member at the top level
     and nested, and in `Request-Id`, leaves only `[redacted]` in the
     exception's attributes, its `str`, and the SDK's log records;
+  - a call whose path segment and query value contain the key, answered
+    with a `404` and failing with a dropped connection on every attempt,
+    leaves `[redacted]` in their place in `path`, `str`, the SDK's log
+    records, and the URL of every request in the chain, including a key
+    with characters that percent-encoding changes, such as `/` and `=`;
   - the logger has no handlers and logs nothing at `WARNING` or above;
   - a supplied client's headers and `auth`, and that it is left open;
   - a supplied client with `follow_redirects=True` that receives a `302`
