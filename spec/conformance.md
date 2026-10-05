@@ -802,7 +802,7 @@ cutoff up to its last sync.
 | Denied access, invalid credentials, invalid input, throttling, and transient errors are distinguishable from one another and from an empty result | `refusals-are-not-retried`, `access-revoked-during-iteration`, `error-bodies-the-api-did-not-write`, `throttled-on-every-attempt`, `transient-errors-then-success` |
 | Revoking access, forcing throttling beyond the retry budget, and a revision during a download (demonstration step 5) | `access-revoked-during-iteration`, `throttled-on-every-attempt`, `snapshot-kept-across-a-revision` |
 | The caller controls concurrency and cleanup | `iteration-is-lazy` |
-| Pages and tokens are available alongside a record iterator, and a job saves both in one transaction | `resume-after-interrupted-download`, `scheduled-job-resumes` |
+| Pages and tokens are available alongside a record iterator, and a job saves both in one transaction | `resume-after-interrupted-download`, `scheduled-job-resumes`; that a failure between a page's revisions and its checkpoint saves neither, in plan step 10's tests, since these scenarios fail only between transactions |
 | Pagination stays on one snapshot; an expired snapshot is reported as requiring a restart | `snapshot-kept-across-a-revision`, `pages-must-share-a-snapshot`, `resume-after-snapshot-expiry` |
 | `Retry-After` in both forms; the caller's deadline covers requests and waits; only safe reads are retried | `retry-after-seconds`, `retry-after-http-date`, `retry-after-invalid`, `deadline-during-request`, `deadline-bounds-backoff`; only `GET` exists at stage 1 |
 | Errors carry the provider's request ID and omit the credential | `request-id-from-any-response`, `request-id-from-the-api`, `key-absent-from-errors-and-logs` |

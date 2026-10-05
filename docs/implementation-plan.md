@@ -359,6 +359,11 @@ Follows D2 and D6. Waits for the same image as step 8.
   position refused as `position_expired` or `position_ahead`, each restart
   the load from the first page in the same run, keep the rows already
   saved, and exit with status 0.
+- Tests that each page's transaction is atomic, for a query page and for a
+  change page: a failure injected after the page's revisions are written
+  and before its checkpoint is, such as a SQLite trigger that aborts the
+  checkpoint's update, leaves neither saved, and the next `sync` saves the
+  page once and continues from it.
 - Turn on `research-example`, `scheduled-job-resumes`,
   `scheduled-job-follows-updates`, and `scheduled-job-starts-empty`. CI
   runs them from a clean virtual environment with the wheel and its
