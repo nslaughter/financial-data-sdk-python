@@ -219,6 +219,8 @@ changes the step's status to `Not started`.
   - jitter stays within its bounds and uses the random source;
   - `Retry-After` in each form;
   - the deadline passing during a request, and before a wait;
+  - a caller-supplied client's own timeout, with `timeout=None`, retried
+    and then raised as `TransportError`;
   - the key absent from every exception, as rendered by `str`, `repr`, and
     `traceback.format_exception`, from the request of every exception in
     its `__cause__` and `__context__` chain, including those of earlier

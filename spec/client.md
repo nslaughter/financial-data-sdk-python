@@ -375,7 +375,7 @@ and nothing is missed or repeated. The contract's
 | `UnsupportedAPIVersionError(APIError)` | `404 unsupported_api_version`. |
 | `RateLimitError(APIError)` | `429`, with any code, once retries stop. |
 | `ServerError(APIError)` | Any `5xx`, with any code, once retries stop. |
-| `TransportError(FinancialDataError)` | No response arrived because connecting failed or the connection broke, once retries stop. `__cause__` is httpx's exception. |
+| `TransportError(FinancialDataError)` | No response arrived because connecting failed, the connection broke, or a timeout of a caller-supplied HTTP client expired while no deadline applied, once retries stop. `__cause__` is httpx's exception. |
 | `DeadlineExceededError(FinancialDataError, TimeoutError)` | The call's deadline passed while a request was in flight. |
 | `UnexpectedResponseError(FinancialDataError)` | A response the API's documents do not allow: a successful response that fails [validation](#validating-responses), a `1xx` or `3xx` status, or a page that breaks a pagination guarantee. |
 
