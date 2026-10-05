@@ -652,18 +652,23 @@ request still carries it.
 #### `custom-http-client`
 
 A caller-supplied `httpx.Client` carries the SDK's requests with the
-caller's settings, and the caller keeps ownership of it (D1).
+caller's settings, except that the SDK follows no redirect, and the caller
+keeps ownership of it (D1).
 
 1. Create
-   `http = httpx.Client(headers={"X-Customer": "acme"}, auth=("user", "pass"), event_hooks={"request": [hook]})`,
+   `http = httpx.Client(headers={"X-Customer": "acme"}, auth=("user", "pass"), follow_redirects=True, event_hooks={"request": [hook]})`,
    where `hook` counts requests. In a `with Client(http_client=http, ...)`
    block, `client.series.list()` returns the series. The proxy received
    one request carrying `X-Customer: acme`,
    `Authorization: Bearer demo-research-key`, and a `User-Agent` beginning
    `financial-data-sdk-python/`. `hook` counted 1.
-2. After the block, `http.is_closed` is false, and `http` can still send a
+2. In the same block, add `respond` 302 on request 1 of `GET /v1/series`,
+   with `Location` set to the proxy's URL for `/v1/series`.
+   `client.series.list()` raises `UnexpectedResponseError` with `status`
+   302, although `http` follows redirects. Requests: 1. Clear the rules.
+3. After the block, `http.is_closed` is false, and `http` can still send a
    request.
-3. Close `http`. A new `Client(http_client=http, ...)` raises
+4. Close `http`. A new `Client(http_client=http, ...)` raises
    `ClientClosedError` from `client.series.list()`. Requests: none.
 
 #### `request-id-from-any-response`

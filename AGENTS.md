@@ -92,7 +92,10 @@ The README describes the project for people; it is not a specification.
   in full before yielding from it.
 - A caller-supplied `httpx.Client` is never closed by the SDK. Check
   `is_closed` before each request, and pass the SDK's own `auth` so that
-  the client's `auth` cannot replace the bearer key.
+  the client's `auth` cannot replace the bearer key. Pass
+  `follow_redirects=False` on every request, with either client, so that
+  httpx never reads a redirect's body where the deadline cannot be
+  checked.
 - The conversion of SDK results to JSON belongs to `tests/support/`, not
   to the package.
 - The examples import only public names, and run from the installed

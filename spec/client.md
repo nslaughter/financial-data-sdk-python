@@ -504,9 +504,11 @@ read of its deadline: at most the time that remained when its last attempt
 began. Before they arrive, httpx waits for a connection, connects, sends,
 and reads the headers without returning to the SDK, so an attempt can run
 past the deadline by several such waits, and a server that sends its
-headers a few bytes at a time can hold it longer still. httpx does not time
-out resolving the API's host name. A caller who needs a hard bound runs the
-call where it can abandon it, such as another thread.
+headers a few bytes at a time can hold it longer still. httpx also runs a
+caller-supplied client's event hooks before it returns, so a response hook
+that reads the body reads it before the SDK's first check. httpx does not
+time out resolving the API's host name. A caller who needs a hard bound
+runs the call where it can abandon it, such as another thread.
 
 ## Requests
 
@@ -517,9 +519,11 @@ call where it can abandon it, such as another thread.
   `Accept: application/json`, and
   `User-Agent: financial-data-sdk-python/<SDK version> python/<Python version>`.
 - Every request is a `GET` without a body.
-- The HTTP client the SDK creates does not follow redirects, so a `3xx`
-  raises `UnexpectedResponseError`. A caller-supplied client follows its
-  own settings.
+- The SDK follows no redirect, with its own HTTP client or a
+  caller-supplied one: it passes `follow_redirects=False` on every request,
+  so a `3xx` raises `UnexpectedResponseError`. A client that follows a
+  redirect reads the redirect's body inside httpx, where the SDK cannot
+  check the deadline (D9), and the API's documents allow no `3xx`.
 
 ## Credentials and logging
 
@@ -567,6 +571,8 @@ call where it can abandon it, such as another thread.
   credential replaces any `auth` the client has;
 - passes a timeout on each attempt only when a deadline applies; otherwise
   the client's own timeouts apply;
+- follows no redirect, whatever the client's `follow_redirects`
+  ([Requests](#requests));
 - never closes it, because the caller owns it.
 
 A customer uses this to add proxies, TLS settings, or event hooks, and

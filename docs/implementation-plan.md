@@ -204,7 +204,7 @@ how the deadline bounds a slow response.
   - the key replaced with `[redacted]` in any text taken from a response,
     before an exception or a log record holds it;
   - the three request headers;
-  - no redirects on the SDK's own client;
+  - no redirect followed, through the SDK's own client or a supplied one;
   - a supplied client's settings, `auth` replaced, never closed, and
     `ClientClosedError` when it is closed;
   - logging, as
@@ -234,7 +234,9 @@ how the deadline bounds a slow response.
     and nested, and in `Request-Id`, leaves only `[redacted]` in the
     exception's attributes, its `str`, and the log records;
   - the logger has no handlers and logs nothing at `WARNING` or above;
-  - a supplied client's headers and `auth`, and that it is left open.
+  - a supplied client's headers and `auth`, and that it is left open;
+  - a supplied client with `follow_redirects=True` that receives a `302`
+    sends one request and raises `UnexpectedResponseError`.
 
 Out of scope: the endpoints.
 
