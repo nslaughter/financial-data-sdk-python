@@ -229,7 +229,8 @@ Out of scope: the endpoints.
   - request counts as iterators advance, and after an early `break`;
   - resuming with `page_token` repeats every argument;
   - each pagination guarantee raises;
-  - an empty result raises nothing;
+  - an empty result raises nothing, and neither does an empty caught-up
+    change page, whose `next_position` is the position it read from;
   - `ClientClosedError` after `close()`, through a derived client, and
     through a supplied client the caller closed.
 

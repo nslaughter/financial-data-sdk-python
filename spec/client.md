@@ -339,9 +339,11 @@ and nothing is missed or repeated. The contract's
   transaction. The SDK returns the positions the API sends and never
   computes one from a `sequence`, because sequences can have gaps
   ([change stream][dc-stream]).
-- If a page is not caught up but holds no revisions, or its `next_position`
-  is not greater than the position it read from, `pages()` raises
-  `UnexpectedResponseError`, so it cannot loop forever.
+- A page that is not caught up must hold at least one revision and have a
+  `next_position` greater than the position it read from; otherwise
+  `pages()` raises `UnexpectedResponseError`, so it cannot loop forever. A
+  caught-up page needs neither: read at the head, it is empty and its
+  `next_position` is the position it read from.
 - `after` beyond the head raises `PositionAheadError`. A position whose next
   event is past retention raises `PositionExpiredError`; the caller loads
   the data again with a query and continues from that query's position
