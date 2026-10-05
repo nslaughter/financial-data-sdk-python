@@ -32,7 +32,7 @@ The README describes the project for people; it is not a specification.
   a time, in order, within its stated scope, as described in
   [Doing the next item](#doing-the-next-item). Note anything you deferred
   in the pull request description.
-- **Follow the owner specifications.** D1 to D8 in `spec/client.md` are
+- **Follow the owner specifications.** D1 to D9 in `spec/client.md` are
   owner specifications, decided by the operator on 2026-10-05. Implement
   them as written, and don't reopen one or depart from it on your own; if
   one seems wrong, stop and report it, as for any specification. Do not
@@ -76,6 +76,9 @@ The README describes the project for people; it is not a specification.
   source in, so their rules can be tested directly and deterministically.
 - Deadlines and waits use `time.monotonic()`. Only a `Retry-After` date is
   compared with `datetime.now(UTC)`.
+- Read each response as a stream, and check the deadline when its headers
+  arrive and after each chunk of its body (D9). httpx's timeouts bound
+  each socket operation, not the whole response.
 - Never format a request's headers into a message or a log record. Before
   raising, redact the `Authorization` header on the request of every httpx
   exception in the `__cause__` and `__context__` chain, not only the direct

@@ -24,7 +24,7 @@ A step whose status is `Needs operator decision` cannot start until the
 operator records the decision here. A step whose status is
 `Waiting on the API` cannot start until what it waits for exists and the
 operator changes its status to `Not started`. The contract's design
-decisions, D1 to D8, are all
+decisions, D1 to D9, are all
 [owner specifications](../spec/client.md#owner-specifications), decided on
 2026-10-05; the **Owner specifications** column names those each step
 follows.
@@ -33,7 +33,7 @@ follows.
 | --- | --- | --- | --- |
 | 1. Create the package, records, errors, and configuration | D1, D4, D5 | Not started | |
 | 2. Decode responses and format arguments | D1 | Not started | |
-| 3. Send requests with retries and deadlines | D1, D7 | Needs operator decision | |
+| 3. Send requests with retries and deadlines | D1, D7, D9 | Not started | |
 | 4. Query the catalog, observations, and the change stream | | Not started | |
 | 5. Convert records to pandas | D6 | Not started | |
 | 6. Build the SDK runner and the fault proxy | D3, D5 | Not started | |
@@ -46,9 +46,6 @@ follows.
 
 What each step that cannot start yet needs:
 
-- **Step 3** needs the operator's choice of how the deadline bounds a
-  response that arrives slowly, an
-  [open question](../spec/client.md#open-questions) in the client contract.
 - **Steps 8 to 10** need the stage 1 image, which is the API's plan
   [step 7](https://github.com/nslaughter/financial-data-api/blob/main/docs/implementation-plan.md#7-publish-the-demo-api-image).
   That step itself waits on the operator's choice of image name and tag
@@ -184,11 +181,8 @@ Out of scope: HTTP.
 
 ### 3. Send requests with retries and deadlines
 
-Follows D1 for the HTTP client and D7 for reading `Request-Id`. Before this
-step starts, the operator decides how the deadline bounds a response whose
-headers or body arrive slowly ([Deadline](../spec/client.md#deadline)),
-records it in the client contract with the scenarios that show it, and
-changes the step's status to `Not started`.
+Follows D1 for the HTTP client, D7 for reading `Request-Id`, and D9 for
+how the deadline bounds a slow response.
 
 - In `_retry.py`:
   - the retry decision for every outcome in
@@ -199,7 +193,10 @@ changes the step's status to `Not started`.
     and an invalid value ignored;
   - the three bounds.
 - In `_transport.py`, one call:
-  - each attempt runs with an httpx timeout equal to the time remaining;
+  - each attempt runs with an httpx timeout equal to the time remaining
+    when it begins, and reads the response as a stream, checking the
+    deadline when the headers arrive and after each chunk of the body, as
+    [Deadline](../spec/client.md#deadline) says;
   - `DeadlineExceededError` and `TransportError`, with `Authorization`
     redacted on the request of every httpx exception in the raised
     exception's `__cause__` and `__context__` chain;
@@ -221,6 +218,12 @@ changes the step's status to `Not started`.
   - jitter stays within its bounds and uses the random source;
   - `Retry-After` in each form;
   - the deadline passing during a request, and before a wait;
+  - a body whose chunks move the clock past the deadline, refused at the
+    first check after it, even when the body is complete, with the
+    response closed and `__cause__` `None`;
+  - an httpx timeout during an attempt with a deadline, raised as
+    `DeadlineExceededError` with httpx's exception as its `__cause__`, and
+    not retried;
   - a caller-supplied client's own timeout, with `timeout=None`, retried
     and then raised as `TransportError`;
   - the key absent from every exception, as rendered by `str`, `repr`, and
@@ -292,7 +295,7 @@ Follows D3 for the proxy and D5 for reading the vendored contract.
   It takes `--base-url` and `--stage`, both required.
 - In `tests/faults`, implement
   [The fault proxy](../spec/conformance.md#the-fault-proxy): rules, the
-  five actions, the records, and the `Retry-After` date helper.
+  six actions, the records, and the `Retry-After` date helper.
 - In `tests/scenarios`, the harness: the profile; `enabled.txt`, checked
   against the headings under **Scenarios** in `spec/conformance.md` and
   against the tests; and the proxy started in front of `--base-url`.

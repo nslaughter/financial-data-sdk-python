@@ -1,7 +1,7 @@
 # Client contract: financial data SDK for Python
 
-**Status:** Draft 0.1.0, for the operator's review; not tagged. Its eight
-design decisions, D1 to D8, are [owner specifications](#owner-specifications):
+**Status:** Draft 0.1.0, for the operator's review; not tagged. Its nine
+design decisions, D1 to D9, are [owner specifications](#owner-specifications):
 the operator decided each on 2026-10-05, and an implementation follows them
 as written. The other [decisions](#decisions) are proposed by this draft and
 take effect when the operator approves it. None of the SDK exists yet.
@@ -439,9 +439,9 @@ retried when an attempt ends with one of these outcomes
 | `429` | Yes |
 | `500`, `502`, `503`, `504` | Yes |
 | Any other status | No |
-| Connecting failed or timed out | Yes |
-| The connection broke before the response was complete, or a timeout set on a caller-supplied client expired | Yes |
-| The call's deadline passed | No |
+| Connecting failed | Yes |
+| The connection broke before the response was complete, or a timeout set on a caller-supplied client expired while no deadline applied | Yes |
+| The call's deadline passed, including an httpx timeout while a deadline applied ([Deadline](#deadline)) | No |
 | A successful response failed validation | No |
 
 A later version that adds a request with effects, such as creating an
@@ -481,15 +481,32 @@ again ([decision 12](#decisions)).
 `timeout` is the deadline for one call, in seconds, covering every attempt
 and every wait; `None` sets none. In `pages()` and `iterate()`, each page's
 request is one call with its own deadline, because the time between pages
-belongs to the caller ([decision 15](#decisions)). Each attempt runs with an
-httpx timeout equal to the time remaining. When the deadline passes during
-an attempt, the SDK raises `DeadlineExceededError` and does not retry.
+belongs to the caller ([decision 15](#decisions)).
 
-httpx applies that timeout to each connect, write, and read separately, not
-to the attempt as a whole, so a server that sends its headers or its body a
-few bytes at a time can keep an attempt running past the deadline. How the
-SDK bounds such an attempt is an [open question](#open-questions), and plan
-step 3 waits for the answer.
+The deadline bounds each wait on the network, not each attempt as a whole
+(D9):
+
+- Each attempt runs with an httpx timeout equal to the time remaining when
+  the attempt begins. httpx applies it separately to waiting for a pooled
+  connection, connecting, sending, and each read.
+- The SDK reads the response as a stream. It checks the deadline when the
+  headers have arrived and after each chunk of the body. At the first check
+  that finds the deadline passed, it closes the response and raises
+  `DeadlineExceededError`, even if the body is complete.
+- An httpx timeout during an attempt that has a deadline also raises
+  `DeadlineExceededError`, with httpx's exception as its `__cause__`. Each
+  of the attempt's timeouts is the time that remained when it began, so
+  when one expires, the deadline has passed.
+- After `DeadlineExceededError`, the SDK does not retry.
+
+Once a response's headers have arrived, a call therefore raises within one
+read of its deadline: at most the time that remained when its last attempt
+began. Before they arrive, httpx waits for a connection, connects, sends,
+and reads the headers without returning to the SDK, so an attempt can run
+past the deadline by several such waits, and a server that sends its
+headers a few bytes at a time can hold it longer still. httpx does not time
+out resolving the API's host name. A caller who needs a hard bound runs the
+call where it can abandon it, such as another thread.
 
 ## Requests
 
@@ -516,8 +533,9 @@ step 3 waits for the answer.
   `UnicodeEncodeError` that holds the whole header value, key included.
 - The key appears only in that header. It is not in any exception's
   message, arguments, or attributes, in `repr(client)`, or in any log
-  record. A `TransportError` or `DeadlineExceededError` chains httpx's
-  exception as its `__cause__`, and that exception holds the request.
+  record. A `TransportError`, or a `DeadlineExceededError` raised because
+  an httpx timeout expired, chains httpx's exception as its `__cause__`,
+  and that exception holds the request.
   Before raising any exception, the SDK replaces the `Authorization` value
   with `Bearer [redacted]` on the request of every httpx exception
   reachable from it through `__cause__` and `__context__`, so an earlier
@@ -830,8 +848,9 @@ it. Each can be revisited in a later version.
 
 ## Owner specifications
 
-The operator decided D1 to D8 on 2026-10-05, each by choosing the
-recommended option among those set out below. They are owner
+The operator decided D1 to D9 on 2026-10-05: D1 to D8 by choosing the
+recommended option among those set out below, and D9 by choosing among
+options set out after review, without a recommendation. They are owner
 specifications: an implementation follows them as written, and changing one
 needs the operator and a new version of this document. The options stay
 with each as the record of the choice.
@@ -980,6 +999,23 @@ repository.
 release with the wheel and the source distribution attached, installable by
 URL.
 
+### D9. How the deadline bounds a slow response
+
+**Owner specification:** chosen by the operator on 2026-10-05, after review
+showed that httpx's timeouts bound each socket operation, not a whole
+request: with httpx 0.28.1, a 1-second timeout let a body sent one byte
+every 0.4 seconds run 2.5 seconds.
+
+| Option | For | Against |
+| --- | --- | --- |
+| A watchdog that closes the connection at the deadline | Bounds the whole attempt, with either client | A thread per call, and it reaches the socket only through httpcore's extensions |
+| A deadline-aware httpcore network backend | Bounds every socket operation by the deadline itself, without a thread | The SDK imports httpcore beside httpx (D1), and a caller's client is not covered |
+| Bound each wait, and check the deadline as the body arrives | Plain httpx, the same with a caller's client, and testable with `httpx.MockTransport` | A response slow to send its headers can run past the deadline |
+
+**Specification: bound each wait, and check the deadline as the body
+arrives.** [Deadline](#deadline) says what this promises and what it does
+not, and `deadline-during-slow-body` shows it.
+
 ## Open questions
 
 - **The stage 4 breaking change.** API v1 already uses the explicit time
@@ -999,18 +1035,6 @@ URL.
   question.
 - **The retry defaults** rest on no measurement, because the API defines no
   throttling ([decision 12](#decisions)).
-- **Bounding a slow response by the deadline.** httpx's timeouts bound each
-  socket operation, not a whole request: with httpx 0.28.1, a 1-second
-  timeout let a body sent one byte every 0.4 seconds run 2.5 seconds, and
-  headers sent a byte at a time ran past it too ([Deadline](#deadline)).
-  The options include a watchdog that closes the connection at the
-  deadline, which needs a thread and reaches the socket only through
-  httpcore's extensions; a deadline-aware network backend for the SDK's
-  own client, which imports httpcore beside httpx (D1) and does not cover
-  a caller's client; and promising less: each socket operation lasts at
-  most the time remaining when the attempt began, and the deadline is also
-  checked between chunks of the body. Plan step 3 waits for the choice,
-  and scenarios for slow headers and a slow body come with it.
 - **Stage 2.** When `published_as_of`, the revision history, the release
   calendar, and exports enter the SDK, and whether they change its record
   types.

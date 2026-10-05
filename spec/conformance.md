@@ -185,6 +185,7 @@ added. Its action is one of these:
 | `problem` | Answers with the given status as `application/problem+json`, with the body `{"status": <status>, "code": <code>, "title": "Injected fault", "detail": "Injected by the fault proxy.", "parameter": <parameter or null>}`, and any given headers. |
 | `drop` | Reads the request, then closes the connection without a response. |
 | `stall` | Reads the request and sends nothing, until the client closes the connection or the scenario ends. |
+| `trickle` | Forwards the request, then sends the API's status and headers at once, and its body the given number of bytes at a time, with the given interval before each. |
 | `rewrite` | Forwards the request, then answers with the API's response, its body parsed, changed by the given function, and serialized again. |
 
 The proxy records every request it receives (method, path, query, headers,
@@ -358,6 +359,18 @@ after it.
 1. `client.with_options(timeout=1.0).datasets.list()` raises
    `DeadlineExceededError` with `attempts` 1. Requests: 1. Elapsed: 1.0 to
    1.5 s.
+
+#### `deadline-during-slow-body`
+
+The deadline bounds a response whose body arrives slowly, although no
+single read waits long enough for httpx's timeout to expire (D9).
+
+- **Proxy:** `GET /v1/datasets`, every request: `trickle`, 1 byte every
+  0.4 s.
+
+1. `client.with_options(timeout=2.0).datasets.list()` raises
+   `DeadlineExceededError` with `attempts` 1, and with `__cause__` `None`,
+   because no httpx timeout expired. Requests: 1. Elapsed: 2.0 to 2.9 s.
 
 #### `deadline-bounds-backoff`
 
@@ -790,7 +803,7 @@ cutoff up to its last sync.
 | --- | --- |
 | The built package installs in a clean environment, and the documented workflow runs against the pinned demo API and passes the shared contract's checks | The stage 1 shared checks, run from the installed wheel by plan step 12's release workflow; `research-example`, `scheduled-job-resumes`, `scheduled-job-follows-updates`, `scheduled-job-starts-empty` |
 | Authentication and rate-limit errors are reported distinctly | `access-control` (shared), `refusals-are-not-retried`, `access-revoked-during-iteration`, `throttled-on-every-attempt`, `retry-after-beyond-budget` |
-| Retries stop within their configured bounds | `throttled-on-every-attempt`, `server-error-exhausts-attempts`, `connection-dropped-every-attempt`, `retry-after-beyond-budget`, `retry-after-beyond-deadline`, `deadline-during-request`, `deadline-bounds-backoff`; jitter in plan step 3's unit tests, since one run cannot show a random wait |
+| Retries stop within their configured bounds | `throttled-on-every-attempt`, `server-error-exhausts-attempts`, `connection-dropped-every-attempt`, `retry-after-beyond-budget`, `retry-after-beyond-deadline`, `deadline-during-request`, `deadline-during-slow-body`, `deadline-bounds-backoff`; jitter in plan step 3's unit tests, since one run cannot show a random wait |
 | An interrupted paginated download resumes with no missing or duplicate records | `resume-after-interrupted-download`, `scheduled-job-resumes` |
 | The September 4 query still returns 102.4 after the revision is loaded | `august-2026-at-cutoffs` and `pagination` (shared), `snapshot-kept-across-a-revision`, `research-example`, `scheduled-job-resumes` |
 
@@ -804,7 +817,7 @@ cutoff up to its last sync.
 | The caller controls concurrency and cleanup | `iteration-is-lazy` |
 | Pages and tokens are available alongside a record iterator, and a job saves both in one transaction | `resume-after-interrupted-download`, `scheduled-job-resumes`; that a failure between a page's revisions and its checkpoint saves neither, in plan step 10's tests, since these scenarios fail only between transactions |
 | Pagination stays on one snapshot; an expired snapshot is reported as requiring a restart | `snapshot-kept-across-a-revision`, `pages-must-share-a-snapshot`, `resume-after-snapshot-expiry` |
-| `Retry-After` in both forms; the caller's deadline covers requests and waits; only safe reads are retried | `retry-after-seconds`, `retry-after-http-date`, `retry-after-invalid`, `deadline-during-request`, `deadline-bounds-backoff`; only `GET` exists at stage 1 |
+| `Retry-After` in both forms; the caller's deadline covers retry waits and bounds each wait on the network; only safe reads are retried | `retry-after-seconds`, `retry-after-http-date`, `retry-after-invalid`, `deadline-during-request`, `deadline-during-slow-body`, `deadline-bounds-backoff`; only `GET` exists at stage 1 |
 | Errors carry the provider's request ID and omit the credential | `request-id-from-any-response`, `request-id-from-the-api`, `key-absent-from-errors-and-logs` |
 | Customers can supply their own transport | `custom-http-client`; the SDK runner's recording client |
 | Logging without global handlers | Plan step 3's unit tests; `key-absent-from-errors-and-logs` |
@@ -816,7 +829,7 @@ These are proposed with this draft and take effect when the operator
 approves it.
 
 1. **The SDK scenarios are prose matched to tests by name, not a notation
-   the harness parses.** There are 32, each a few calls against a real
+   the harness parses.** There are 33, each a few calls against a real
    API. A parsed notation, like the Polymarket client's, would cost more
    than the drift it prevents. A reviewer compares each test with its
    scenario, and the harness checks that names and headings agree.

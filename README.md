@@ -14,7 +14,7 @@ research workflow.
 README and the SDK's specification: the [client contract](spec/client.md),
 the [conformance scenarios](spec/conformance.md), the
 [implementation plan](docs/implementation-plan.md), and the rules for
-implementation agents in [`AGENTS.md`](AGENTS.md). The contract's eight
+implementation agents in [`AGENTS.md`](AGENTS.md). The contract's nine
 design decisions are settled as owner specifications. None of the SDK has
 been implemented or tested yet. The demo API and the shared data contract
 live in [financial-data-api](https://github.com/nslaughter/financial-data-api).
@@ -121,8 +121,10 @@ which version the provider could deliver by the cutoff, so the query returns
   change them. An expired snapshot is reported as requiring a restart.
 - **Retries are bounded and safe to repeat.** The client uses a finite attempt
   limit, a total retry budget, backoff with jitter, and `Retry-After` in both
-  its date and delay forms. The caller's deadline covers requests and retry
-  waits. Only reads that are safe to repeat are retried.
+  its date and delay forms. The caller's deadline covers retry waits and
+  bounds each wait on the network; the
+  [client contract](spec/client.md#deadline) says how far a slow response
+  can run past it. Only reads that are safe to repeat are retried.
 - **Errors are traceable and omit secrets.** Errors include the provider's
   request ID, which the demo API adds to its responses in contract version
   0.4.0. Neither errors nor logs contain the credential.
