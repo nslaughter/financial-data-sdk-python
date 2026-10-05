@@ -403,7 +403,7 @@ from a wrong base URL rather than a missing series
 | --- | --- | --- |
 | `status` | `APIError`, `UnexpectedResponseError` | The HTTP status, or `None` for an `UnexpectedResponseError` raised by a pagination check. |
 | `code`, `title`, `detail`, `parameter` | `APIError` | The problem response's members, or `None` when the response is not one or lacks the member. `parameter` names the parameter at fault. |
-| `problem` | `APIError` | The whole problem body as a read-only mapping, or `None`. |
+| `problem` | `APIError` | The whole problem body as a read-only mapping, with the key redacted ([Credentials and logging](#credentials-and-logging)), or `None`. |
 | `retry_after` | `APIError` | The seconds the response's `Retry-After` asked for, or `None` ([Waiting](#waiting)). |
 | `request_id` | `APIError`, `UnexpectedResponseError` | The response's `Request-Id` header, or `None` (D7). |
 | `method`, `path` | `APIError`, `TransportError`, `DeadlineExceededError`, `UnexpectedResponseError` | The request's method, and its path with the query string, as sent. |
@@ -514,6 +514,13 @@ step 3 waits for the answer.
   exception as its `__cause__`, and that exception holds the request, so
   the SDK replaces the request's `Authorization` value with
   `Bearer [redacted]` before raising ([decision 13](#decisions)).
+- A response can echo the key, as a gateway's error page might. Before an
+  exception or a log record holds any text the SDK takes from a response,
+  the SDK replaces every occurrence of the key in it with `[redacted]`: in
+  every string of a problem body, at any depth, and so in `code`, `title`,
+  `detail`, `parameter`, `problem`, and `str(error)`; in `Request-Id`; and
+  in anything else taken from the response. Keeping the key out comes
+  before keeping the response's text exact.
 - Logging uses `logging.getLogger("financial_data")`. The SDK adds no
   handler, sets no level, and never calls `logging.basicConfig`. It logs
   each attempt at `DEBUG`, with the method, path, attempt number, status or

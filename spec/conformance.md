@@ -614,16 +614,23 @@ request still carries it.
 5. Add `respond` 200 `text/html` on every `GET /v1/series`.
    `client.series.list()` raises `UnexpectedResponseError`. Clear the
    rules.
-6. For each exception raised above, `demo-research-key` does not occur in
+6. Add `respond` 401 on every `GET /v1/series`, with
+   `Content-Type: application/problem+json`,
+   `Request-Id: demo-research-key`, and the body
+   `{"status": 401, "code": "unauthenticated", "title": "Unauthenticated", "detail": "Bearer demo-research-key is not valid.", "parameter": null, "echo": {"headers": ["Authorization: Bearer demo-research-key"]}}`.
+   `client.series.list()` raises `AuthenticationError` with `detail`
+   `Bearer [redacted] is not valid.` and `request_id` `[redacted]`. Clear
+   the rules.
+7. For each exception raised above, `demo-research-key` does not occur in
    its `str`, its `repr`, the `repr` of its `args` and of each attribute
    the client contract lists, or `traceback.format_exception` of it. For
    the `TransportError` and the `DeadlineExceededError`, the
    `Authorization` header of the request their `__cause__` holds is
    `Bearer [redacted]`.
-7. `demo-research-key` occurs in no captured record's message, arguments,
+8. `demo-research-key` occurs in no captured record's message, arguments,
    or attributes, and not in `repr(client)`. The captured records include
    two `INFO` retry records from step 3.
-8. Every request the proxy received carried
+9. Every request the proxy received carried
    `Authorization: Bearer demo-research-key`.
 
 #### `custom-http-client`

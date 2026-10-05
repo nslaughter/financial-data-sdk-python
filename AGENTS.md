@@ -76,8 +76,10 @@ The README describes the project for people; it is not a specification.
   compared with `datetime.now(UTC)`.
 - Never format a request's headers into a message or a log record. Redact
   the `Authorization` header on httpx's request before chaining its
-  exception. Tests search every rendering of an exception and every log
-  record for the key itself.
+  exception. Replace the key with `[redacted]` in any text taken from a
+  response, such as a problem body or `Request-Id`, before an exception or
+  a log record holds it. Tests search every rendering of an exception and
+  every log record for the key itself.
 - Logging uses `logging.getLogger("financial_data")` with `%`-style
   arguments, at `DEBUG` and `INFO` only, with no handlers.
 - Iterators are generators that hold no open response: read each response
