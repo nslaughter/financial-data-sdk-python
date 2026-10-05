@@ -712,11 +712,13 @@ D7, against contract 0.4.0 or later: errors carry the API's own request ID.
 
 #### `dataframe-keeps-revision-information`
 
-The pandas conversion keeps every revision, every field, and exact values
-(D6).
+The SDK's records keep every field of the fixtures, and the pandas
+conversion keeps every revision, every field, and exact values (D6).
 
 1. `revisions = [r for p in client.changes.pages("core-indicators", after=0) for r in p.data]`,
-   which holds 37 revisions.
+   which holds 37 revisions. Converted to JSON as the SDK runner
+   [converts a result](#converting-a-result), they equal the 37 records of
+   `contract/fixtures/revisions.json`, in order, with all 14 members.
 2. `df = financial_data.pandas.to_dataframe(revisions)` has 37 rows and the
    14 columns in the contract's order.
 3. The `value` column has `object` dtype. Every non-null element is a
@@ -833,7 +835,7 @@ cutoff up to its last sync.
 
 | Claim | Scenarios |
 | --- | --- |
-| Observation and revision identities, periods, availability times, decimal values, units, and missing values survive the client | Every query check (shared), through the [conversion](#converting-a-result); `responses-are-validated`, `dataframe-keeps-revision-information` |
+| Observation and revision identities, periods, availability times, decimal values, units, and missing values survive the client | `dataframe-keeps-revision-information`, which compares all 14 fields of every fixture revision; every query check (shared), through the [conversion](#converting-a-result), for the identities, values, and missing values it names; `responses-are-validated`; the round trip of every fixture record in plan step 2's unit tests |
 | Denied access, invalid credentials, invalid input, throttling, and transient errors are distinguishable from one another and from an empty result | `refusals-are-not-retried`, `access-revoked-during-iteration`, `error-bodies-the-api-did-not-write`, `throttled-on-every-attempt`, `transient-errors-then-success` |
 | Revoking access, forcing throttling beyond the retry budget, and a revision during a download (demonstration step 5) | `access-revoked-during-iteration`, `throttled-on-every-attempt`, `snapshot-kept-across-a-revision` |
 | The caller controls concurrency and cleanup | `iteration-is-lazy`; leaving the block normally, by an exception, and after an iterator stopped early, in plan step 4's unit tests |
