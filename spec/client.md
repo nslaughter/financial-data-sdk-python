@@ -379,7 +379,7 @@ and nothing is missed or repeated. The contract's
 | `ServerError(APIError)` | Any `5xx`, with any code, once retries stop. |
 | `TransportError(FinancialDataError)` | No response arrived because connecting failed, the connection broke, or a timeout of a caller-supplied HTTP client expired while no deadline applied, once retries stop. `__cause__` is httpx's exception. |
 | `DeadlineExceededError(FinancialDataError, TimeoutError)` | The call's deadline passed while a request was in flight. |
-| `UnexpectedResponseError(FinancialDataError)` | A response the API's documents do not allow: a successful response that fails [validation](#validating-responses), a `1xx` or `3xx` status, or a page that breaks a pagination guarantee. |
+| `UnexpectedResponseError(FinancialDataError)` | A response the API's documents do not allow: a successful response that fails [validation](#validating-responses), a body that does not decode, a `1xx` or `3xx` status, or a page that breaks a pagination guarantee. |
 
 ### Choosing the exception
 
@@ -400,6 +400,35 @@ Neither raises one that claims more than the response says: a `404` without
 a problem body is an `APIError`, not a `NotFoundError`, because it may come
 from a wrong base URL rather than a missing series
 ([decision 8](#decisions)).
+
+### Exceptions from httpx
+
+httpx raises its own exceptions while the SDK sends a request and reads the
+response. The SDK raises each as one of its own, with httpx's exception as
+its `__cause__`:
+
+| httpx raises | The SDK raises |
+| --- | --- |
+| `httpx.TimeoutException` | `DeadlineExceededError` while a deadline applies; otherwise, from a caller-supplied client's own timeout, `TransportError` ([Deadline](#deadline)) |
+| Any other `httpx.TransportError` | `TransportError` |
+| `httpx.DecodingError` | `UnexpectedResponseError`, with the response's status: its body does not decode as its `Content-Encoding` says |
+| `httpx.HTTPStatusError` | The exception the response's status chooses, below |
+| `httpx.TooManyRedirects` | Nothing: the SDK follows no redirect, so httpx never raises it ([Requests](#requests)) |
+
+Only a caller-supplied client's event hook raises `httpx.HTTPStatusError`,
+as a response hook that calls `raise_for_status()` does. httpx closes the
+response before the exception reaches the SDK, so its body cannot be read.
+The SDK handles that response as one without a problem body: a `4xx` or
+`5xx` raises by status (rule 2 above), with `retry_after` and `request_id`
+from its headers, and is retried as its status says
+([What is retried](#what-is-retried)); a `1xx` or `3xx` raises
+`UnexpectedResponseError`.
+
+Any other exception raised while the SDK sends a request or reads the
+response, such as one a caller's event hook raises, propagates unchanged
+and is not retried, once the SDK has redacted the `Authorization` header
+on every httpx request in its chain
+([Credentials and logging](#credentials-and-logging)).
 
 ### Attributes
 
@@ -443,6 +472,8 @@ retried when an attempt ends with one of these outcomes
 | The connection broke before the response was complete, or a timeout set on a caller-supplied client expired while no deadline applied | Yes |
 | The call's deadline passed, including an httpx timeout while a deadline applied ([Deadline](#deadline)) | No |
 | A successful response failed validation | No |
+| A body did not decode as its `Content-Encoding` says | No |
+| Any other exception from httpx or from a caller's event hook ([Exceptions from httpx](#exceptions-from-httpx)) | No |
 
 A later version that adds a request with effects, such as creating an
 export, must say whether it is retried. Until it does, such a request is not
@@ -537,14 +568,14 @@ runs the call where it can abandon it, such as another thread.
   `UnicodeEncodeError` that holds the whole header value, key included.
 - The key appears only in that header. It is not in any exception's
   message, arguments, or attributes, in `repr(client)`, or in any log
-  record. A `TransportError`, or a `DeadlineExceededError` raised because
-  an httpx timeout expired, chains httpx's exception as its `__cause__`,
-  and that exception holds the request.
-  Before raising any exception, the SDK replaces the `Authorization` value
-  with `Bearer [redacted]` on the request of every httpx exception
-  reachable from it through `__cause__` and `__context__`, so an earlier
-  attempt's failure left in the chain does not keep the key either
-  ([decision 13](#decisions)).
+  record. An exception the SDK raises for one of httpx's chains it as its
+  `__cause__` ([Exceptions from httpx](#exceptions-from-httpx)), and that
+  exception holds the request. Before any exception leaves an SDK call,
+  whether the SDK raised it or let it propagate, the SDK replaces the
+  `Authorization` value with `Bearer [redacted]` on the request of every
+  httpx exception reachable from it through `__cause__` and `__context__`,
+  itself included, so an earlier attempt's failure left in the chain does
+  not keep the key either ([decision 13](#decisions)).
 - A response can echo the key, as a gateway's error page might. Before an
   exception or a log record holds any text the SDK takes from a response,
   the SDK replaces every occurrence of the key in it with `[redacted]`: in

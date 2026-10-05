@@ -197,9 +197,11 @@ how the deadline bounds a slow response.
     when it begins, and reads the response as a stream, checking the
     deadline when the headers arrive and after each chunk of the body, as
     [Deadline](../spec/client.md#deadline) says;
-  - `DeadlineExceededError` and `TransportError`, with `Authorization`
-    redacted on the request of every httpx exception in the raised
-    exception's `__cause__` and `__context__` chain;
+  - each httpx exception raised as the SDK's own, as
+    [Exceptions from httpx](../spec/client.md#exceptions-from-httpx)
+    says, and `Authorization` redacted on the request of every httpx
+    exception in the `__cause__` and `__context__` chain of any
+    exception that leaves a call, that exception included;
   - `attempts` and `request_id` on every exception that has them;
   - the key replaced with `[redacted]` in any text taken from a response,
     before an exception or a log record holds it;
@@ -226,6 +228,15 @@ how the deadline bounds a slow response.
     not retried;
   - a caller-supplied client's own timeout, with `timeout=None`, retried
     and then raised as `TransportError`;
+  - a supplied client whose response hook calls `raise_for_status()`: a
+    `503` retried and then raised as `ServerError`, and a `403` problem
+    response raised as exactly `APIError`, each with the
+    `httpx.HTTPStatusError` as its `__cause__`;
+  - a `200` whose body is marked `Content-Encoding: gzip` but is not
+    gzip, raised as `UnexpectedResponseError` with `status` 200 after
+    one request;
+  - an exception a supplied client's request hook raises, propagated
+    unchanged and not retried, with the hook called once;
   - the key absent from every exception, as rendered by `str`, `repr`, and
     `traceback.format_exception`, from the request of every exception in
     its `__cause__` and `__context__` chain, including those of earlier
