@@ -364,7 +364,12 @@ Follows D2 and D6. Waits for the same image as step 8.
   refused as `page_token_expired` or `invalid_page_token`, and a saved
   position refused as `position_expired` or `position_ahead`, each restart
   the load from the first page in the same run, keep the rows already
-  saved, and exit with status 0.
+  saved, and exit with status 0. A clock set back during a run starts the
+  run again: for a copy synced at the default clock, a reset to
+  `2024-01-01T00:00:00Z` between the metadata read and the stream request
+  leaves `synced_at` at `2024-01-01T00:00:00Z`, and `query` refuses the
+  June 10, 2025 cutoff. A reset between a first run's metadata read and
+  its load's first page, which no error reveals, starts the run again too.
 - Tests that each page's transaction is atomic, for a query page and for a
   change page: a failure injected after the page's revisions are written
   and before its checkpoint is, such as a SQLite trigger that aborts the

@@ -653,8 +653,11 @@ query, follows the change stream, and answers cutoff queries offline.
    Rows already saved stay, as above. After a reset to an earlier clock,
    some may not be available yet; their `available_at` is later than any
    cutoff the copy answers, so selection never takes them.
-4. When caught up, saves the `server_time` from step 1 as `synced_at` and
-   exits with status 0.
+4. When caught up, reads `client.meta()` again. If this `server_time` is
+   earlier than step 1's, the API's clock was set back during the run, by
+   a reset or a restart, and the job may have caught up to a state older
+   than step 1's time; the run starts again from step 1. Otherwise, it
+   saves step 1's `server_time` as `synced_at` and exits with status 0.
 5. On any other `FinancialDataError`, prints what this run saved (pages and
    records), the token or position the next run resumes from, and the
    error's class, code, and request ID, then exits with status 1. Running
@@ -682,8 +685,12 @@ revision at or below the snapshot position, so every revision comes from
 the stream. Its `complete_from` is null, and the copy answers every cutoff
 up to `synced_at`. Following the stream never changes `complete_from`;
 only a new load does. The copy answers exactly up to `synced_at`, the
-API's time before the last catch-up began. `query` refuses a cutoff
-outside that range, names the range, and suggests asking the API.
+API's time before the last catch-up began. That time is too late only if
+the API's clock was set back after step 1 of `sync` read it and moved past
+that reading again before step 4 read it, which `sync` cannot detect; the
+scenarios reset the API and move its clock only between runs. `query`
+refuses a cutoff outside that range, names the range, and suggests asking
+the API.
 
 In the fixture, a load that runs after the August 2026 release became
 available, at 12:31:10 on September 3, and before its revision did, at
