@@ -350,10 +350,14 @@ Follows D2 and D6. Waits for the same image as step 8.
   [Examples](../spec/client.md#examples-d2) says. They use only public
   names.
 - Tests without the API: load every fixture revision into the
-  scheduled-job example's store, and run each query check in
-  `contract/expected/` against its offline selection. Each result must
-  match. Test `complete_from`, including the null one of a load that saved
-  nothing, and the refusal of cutoffs outside the range.
+  scheduled-job example's store, and run each query check of the stage 1
+  files in `contract/expected/` against its offline selection, using the
+  API's default clock, `2026-10-01T00:00:00Z`, as the cutoff of a check
+  without `available_as_of`. Each result must match. The checks of
+  `published-as-of` select by publication time, a stage 2 feature the
+  example does not have, and are deferred with stage 2. Test
+  `complete_from`, including the null one of a load that saved nothing,
+  and the refusal of cutoffs outside the range.
 - Tests of `sync` with the SDK on `httpx.MockTransport`: a saved page token
   refused as `page_token_expired` or `invalid_page_token`, and a saved
   position refused as `position_expired` or `position_ahead`, each restart
