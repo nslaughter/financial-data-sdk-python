@@ -163,7 +163,7 @@ the API's defaults apply ([decision 5](#decisions)).
 
 | Argument | Accepted | Sent as |
 | --- | --- | --- |
-| `series_id`, `dataset_id` | A `str` other than `""`, `"."`, and `".."` | In a path, percent-encoded with no safe characters, so `/` is encoded too. In a query, exactly as given. |
+| `series_id`, `dataset_id` | A `str`; in a path, other than `""`, `"."`, and `".."` | In a path, percent-encoded with no safe characters, so `/` is encoded too. In a query, exactly as given. |
 | `period_start`, `period_end` | A `datetime.date` that is not a `datetime`, or a `str` | `YYYY-MM-DD` for a `date`. A `str` exactly as given. |
 | `available_as_of` | A timezone-aware `datetime`, or a `str` | For a `datetime`: converted to UTC, truncated to whole seconds, and written `YYYY-MM-DDTHH:MM:SSZ`. A `str` exactly as given. |
 | `page_size`, `limit`, `after` | An `int` that is not a `bool` | Decimal digits, with `-` if negative. |
@@ -173,9 +173,12 @@ the API's defaults apply ([decision 5](#decisions)).
   cannot send faithfully. A wrong type raises `TypeError`. A naive
   `datetime` raises `ValueError`, because its instant is unknown. A
   `series_id` or `dataset_id` that is empty, `.`, or `..` raises
-  `ValueError`, because in a path it would address a different one:
-  percent-encoding leaves `.` unchanged, and httpx removes `.` and `..`
-  segments, so `/v1/series/..` becomes `/v1`.
+  `ValueError` where it is a path segment, as in `client.series.get()` and
+  `client.changes.read()`, because there it would address a different
+  one: percent-encoding leaves `.` unchanged, and httpx removes `.` and
+  `..` segments, so `/v1/series/..` becomes `/v1`. A `series_id` in a
+  query, as in `client.observations.page()`, is sent as given, like any
+  other string, and the API refuses an empty one ([requests][api-requests]).
 - Everything else is the API's to judge, including a malformed date string,
   a page size out of range, a reversed period, and a cutoff after the API's
   clock. The SDK sends the request and raises the API's error
@@ -1160,6 +1163,7 @@ not, and `deadline-during-slow-body` shows it.
 [dc-stream]: https://github.com/nslaughter/financial-data-api/blob/contract-v0.3.0/spec/data-contract.md#change-stream
 [dc-decisions]: https://github.com/nslaughter/financial-data-api/blob/contract-v0.3.0/spec/data-contract.md#decisions
 [api-versioning]: https://github.com/nslaughter/financial-data-api/blob/contract-v0.3.0/spec/api.md#versioning
+[api-requests]: https://github.com/nslaughter/financial-data-api/blob/contract-v0.3.0/spec/api.md#requests
 [api-responses]: https://github.com/nslaughter/financial-data-api/blob/contract-v0.3.0/spec/api.md#responses
 [api-errors]: https://github.com/nslaughter/financial-data-api/blob/contract-v0.3.0/spec/api.md#errors
 [api-auth]: https://github.com/nslaughter/financial-data-api/blob/contract-v0.3.0/spec/api.md#authentication-and-entitlements
