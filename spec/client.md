@@ -478,9 +478,14 @@ again ([decision 12](#decisions)).
 and every wait; `None` sets none. In `pages()` and `iterate()`, each page's
 request is one call with its own deadline, because the time between pages
 belongs to the caller ([decision 15](#decisions)). Each attempt runs with an
-httpx timeout equal to the time remaining, so no phase of a request can
-outlast the deadline. When the deadline passes during an attempt, the SDK
-raises `DeadlineExceededError` and does not retry.
+httpx timeout equal to the time remaining. When the deadline passes during
+an attempt, the SDK raises `DeadlineExceededError` and does not retry.
+
+httpx applies that timeout to each connect, write, and read separately, not
+to the attempt as a whole, so a server that sends its headers or its body a
+few bytes at a time can keep an attempt running past the deadline. How the
+SDK bounds such an attempt is an [open question](#open-questions), and plan
+step 3 waits for the answer.
 
 ## Requests
 
@@ -949,6 +954,19 @@ URL.
   question.
 - **The retry defaults** rest on no measurement, because the API defines no
   throttling ([decision 12](#decisions)).
+- **Bounding a slow response by the deadline.** httpx's timeouts bound each
+  socket operation, not a whole request: with httpx 0.28.1, a 1-second
+  timeout let a body sent one byte every 0.4 seconds run 2.5 seconds, and
+  headers sent the same way run past it too ([Deadline](#deadline)). The
+  options include a watchdog that closes the connection at the deadline,
+  which needs a thread and reaches the socket only through httpcore's
+  extensions; a deadline-aware network backend for the SDK's own client,
+  which imports httpcore beside httpx (D1) and does not cover a caller's
+  client; and promising less: each socket operation lasts at most the time
+  remaining when the attempt began, and the deadline is also checked
+  between chunks of the body.
+  Plan step 3 waits for the choice, and scenarios for slow headers and a
+  slow body come with it.
 - **Stage 2.** When `published_as_of`, the revision history, the release
   calendar, and exports enter the SDK, and whether they change its record
   types.

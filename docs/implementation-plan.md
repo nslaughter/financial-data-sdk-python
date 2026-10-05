@@ -33,7 +33,7 @@ follows.
 | --- | --- | --- | --- |
 | 1. Create the package, records, errors, and configuration | D1, D4, D5 | Not started | |
 | 2. Decode responses and format arguments | D1 | Not started | |
-| 3. Send requests with retries and deadlines | D1, D7 | Not started | |
+| 3. Send requests with retries and deadlines | D1, D7 | Needs operator decision | |
 | 4. Query the catalog, observations, and the change stream | | Not started | |
 | 5. Convert records to pandas | D6 | Not started | |
 | 6. Build the SDK runner and the fault proxy | D3, D5 | Not started | |
@@ -44,8 +44,11 @@ follows.
 | 11. Check request IDs against contract 0.4.0 | D7 | Waiting on the API | |
 | 12. Release a tagged distribution | D8 | Not started | |
 
-What each waiting step needs:
+What each step that cannot start yet needs:
 
+- **Step 3** needs the operator's choice of how the deadline bounds a
+  response that arrives slowly, an
+  [open question](../spec/client.md#open-questions) in the client contract.
 - **Steps 8 to 10** need the stage 1 image, which is the API's plan
   [step 7](https://github.com/nslaughter/financial-data-api/blob/main/docs/implementation-plan.md#7-publish-the-demo-api-image).
   That step itself waits on the operator's choice of image name and tag
@@ -176,7 +179,11 @@ Out of scope: HTTP.
 
 ### 3. Send requests with retries and deadlines
 
-Follows D1 for the HTTP client and D7 for reading `Request-Id`.
+Follows D1 for the HTTP client and D7 for reading `Request-Id`. Before this
+step starts, the operator decides how the deadline bounds a response whose
+headers or body arrive slowly ([Deadline](../spec/client.md#deadline)),
+records it in the client contract with the scenarios that show it, and
+changes the step's status to `Not started`.
 
 - In `_retry.py`:
   - the retry decision for every outcome in
