@@ -548,7 +548,7 @@ restart on its own (decision 7).
 
 Revoking access mid-download ends the iterator with a refusal that differs
 from an empty result. Entitlements are per dataset, so the scenario removes
-the dataset ([open questions](client.md#open-questions)).
+the dataset ([authentication and entitlements][api-auth]).
 
 1. `client.observations.page("activity-index", period_start="2030-01-01", period_end="2030-02-01")`
    returns a page with empty `data` and `next_page_token` `None`, without
@@ -838,4 +838,5 @@ For an SDK exception they report its class and its `status`, `code`,
 `parameter`, and `attempts`. No report contains the key.
 
 [conformance-format]: https://github.com/nslaughter/financial-data-api/blob/contract-v0.3.0/spec/conformance.md
+[api-auth]: https://github.com/nslaughter/financial-data-api/blob/contract-v0.3.0/spec/api.md#authentication-and-entitlements
 [stage-table]: https://github.com/nslaughter/financial-data-api/blob/contract-v0.3.0/spec/data-contract.md#implementations-and-conformance
