@@ -370,6 +370,12 @@ Follows D2 and D6. Waits for the same image as step 8.
   leaves `synced_at` at `2024-01-01T00:00:00Z`, and `query` refuses the
   June 10, 2025 cutoff. A reset between a first run's metadata read and
   its load's first page, which no error reveals, starts the run again too.
+  A new load that fails after its first page, while loading or before
+  catching up, leaves `synced_at` null, and `query` refuses every cutoff
+  until a later `sync` catches up: for a copy synced at page size 10 at
+  the default clock, a reset of the API to `2025-06-10T00:00:00Z` and a
+  failure on the reload's second page, which holds `rev_may25_1`, make
+  `query` refuse the June 10, 2025 cutoff instead of leaving May out.
 - Tests that each page's transaction is atomic, for a query page and for a
   change page: a failure injected after the page's revisions are written
   and before its checkpoint is, such as a SQLite trigger that aborts the

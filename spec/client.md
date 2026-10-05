@@ -635,10 +635,12 @@ query, follows the change stream, and answers cutoff queries offline.
    each page, one transaction saves the page's revisions, its
    `next_page_token`, the snapshot position, and `complete_from`: the
    latest `available_at` among the revisions this load has saved, or null
-   while it has saved none. After the last page, the stage becomes
-   `following`, at the query's position. A query without a cutoff matches
-   the state at its position, so the stream continues from there
-   ([positions][api-positions]).
+   while it has saved none. The same transaction sets `synced_at` to null,
+   so `query` refuses every cutoff until step 4 next saves it
+   ([below](#what-the-local-copy-can-reproduce)). After the last page, the
+   stage becomes `following`, at the query's position. A query without a
+   cutoff matches the state at its position, so the stream continues from
+   there ([positions][api-positions]).
    If the API no longer accepts the saved token, because it has expired
    (`PageTokenExpiredError`) or was issued before the API last restarted or
    reset (`PageTokenError` with code `invalid_page_token`), the load
@@ -684,13 +686,18 @@ stream. A load that saved nothing left nothing out: the series had no
 revision at or below the snapshot position, so every revision comes from
 the stream. Its `complete_from` is null, and the copy answers every cutoff
 up to `synced_at`. Following the stream never changes `complete_from`;
-only a new load does. The copy answers exactly up to `synced_at`, the
+only a new load does. An unfinished load's `complete_from` bounds nothing:
+the pages it has not saved yet may hold the revision a cutoff selects, and
+the rows already saved need not include it. So from a load's first
+page until `sync` next catches up, `synced_at` is null and the copy
+answers no cutoff. The copy answers exactly up to `synced_at`, the
 API's time before the last catch-up began. That time is too late only if
 the API's clock was set back after step 1 of `sync` read it and moved past
 that reading again before step 4 read it, which `sync` cannot detect; the
 scenarios reset the API and move its clock only between runs. `query`
-refuses a cutoff outside that range, names the range, and suggests asking
-the API.
+refuses a cutoff outside that range and suggests asking the API. It names
+the range, or, while `synced_at` is null, says that the copy has not
+caught up since its load began.
 
 In the fixture, a load that runs after the August 2026 release became
 available, at 12:31:10 on September 3, and before its revision did, at
