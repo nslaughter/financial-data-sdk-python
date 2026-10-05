@@ -609,10 +609,11 @@ A position past retention is reported as needing a fresh load.
 
 #### `key-absent-from-errors-and-logs`
 
-The key appears in no error, log record, or representation, while every
-request still carries it.
+The key appears in no error, representation, or record the SDK logs, and
+the libraries under the SDK log no request header, while every request
+still carries it.
 
-- Logging: every record from `financial_data` at `DEBUG` and above is
+- Logging: every record at `DEBUG` and above, from every logger, is
   captured.
 
 1. Set `cred_research`'s `active` to `false`. `client.series.list()` raises
@@ -643,9 +644,12 @@ request still carries it.
    `Authorization: Bearer [redacted]` on it. The chains of the
    `TransportError`, which follows three dropped connections, and of the
    `DeadlineExceededError` hold at least one such request.
-8. `demo-research-key` occurs in no captured record's message, arguments,
-   or attributes, and not in `repr(client)`. The captured records include
-   two `INFO` retry records from step 3.
+8. `demo-research-key` occurs in no message, arguments, or attributes of
+   a captured record from `financial_data`, and not in `repr(client)`. The
+   captured records include two `INFO` retry records from step 3. A
+   captured record from another logger holds the key only if it comes
+   from `httpcore` during step 6, whose response echoes the key in a
+   header ([credentials and logging](client.md#credentials-and-logging)).
 9. Every request the proxy received carried
    `Authorization: Bearer demo-research-key`.
 

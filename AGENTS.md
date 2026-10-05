@@ -86,7 +86,7 @@ The README describes the project for people; it is not a specification.
   direct cause. Replace the key with `[redacted]` in any text taken from a
   response, such as a problem body or `Request-Id`, before an exception or
   a log record holds it. Tests search every rendering of an exception and
-  every log record for the key itself.
+  every record the SDK logs for the key itself.
 - Logging uses `logging.getLogger("financial_data")` with `%`-style
   arguments, at `DEBUG` and `INFO` only, with no handlers.
 - Iterators are generators that hold no open response: read each response

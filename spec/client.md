@@ -567,8 +567,8 @@ runs the call where it can abandon it, such as another thread.
   not repeat the value. httpx would refuse a non-ASCII key with a
   `UnicodeEncodeError` that holds the whole header value, key included.
 - The key appears only in that header. It is not in any exception's
-  message, arguments, or attributes, in `repr(client)`, or in any log
-  record. An exception the SDK raises for one of httpx's chains it as its
+  message, arguments, or attributes, in `repr(client)`, or in any record
+  the SDK logs. An exception the SDK raises for one of httpx's chains it as its
   `__cause__` ([Exceptions from httpx](#exceptions-from-httpx)), and that
   exception holds the request. Before any exception leaves an SDK call,
   whether the SDK raised it or let it propagate, the SDK replaces the
@@ -590,6 +590,14 @@ runs the call where it can abandon it, such as another thread.
   `INFO`, with the same fields, the reason, and the wait. It logs nothing at
   `WARNING` or above, so a program that has not configured logging prints
   nothing.
+- httpx and httpcore log through their own loggers, `httpx` and
+  `httpcore`, which the SDK neither configures nor filters, so the
+  guarantees above cover only the SDK's own records. Neither logs a
+  request's headers, so the `Authorization` header does not reach them.
+  They do log what a response sends before the SDK sees it: httpx its
+  status line at `INFO`, and httpcore its status line and headers at
+  `DEBUG`. A response that echoes the key there, as a gateway's might,
+  puts it in their records.
 
 ## Supplying an HTTP client (D1)
 

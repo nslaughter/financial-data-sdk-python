@@ -240,10 +240,10 @@ how the deadline bounds a slow response.
   - the key absent from every exception, as rendered by `str`, `repr`, and
     `traceback.format_exception`, from the request of every exception in
     its `__cause__` and `__context__` chain, including those of earlier
-    failed attempts, and from every log record;
+    failed attempts, and from every record the SDK logs;
   - a response that echoes the key, in a problem member at the top level
     and nested, and in `Request-Id`, leaves only `[redacted]` in the
-    exception's attributes, its `str`, and the log records;
+    exception's attributes, its `str`, and the SDK's log records;
   - the logger has no handlers and logs nothing at `WARNING` or above;
   - a supplied client's headers and `auth`, and that it is left open;
   - a supplied client with `follow_redirects=True` that receives a `302`
