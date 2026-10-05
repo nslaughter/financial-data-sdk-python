@@ -405,24 +405,28 @@ from a wrong base URL rather than a missing series
 
 httpx raises its own exceptions while the SDK sends a request and reads the
 response. The SDK raises each as one of its own, with httpx's exception as
-its `__cause__`:
+its `__cause__` unless the table says otherwise, once it has removed the
+key from that exception
+([Credentials and logging](#credentials-and-logging)):
 
 | httpx raises | The SDK raises |
 | --- | --- |
 | `httpx.TimeoutException` | `DeadlineExceededError` while a deadline applies; otherwise, from a caller-supplied client's own timeout, `TransportError` ([Deadline](#deadline)) |
 | Any other `httpx.TransportError` | `TransportError` |
 | `httpx.DecodingError` | `UnexpectedResponseError`, with the response's status: its body does not decode as its `Content-Encoding` says |
-| `httpx.HTTPStatusError` | The exception the response's status chooses, below |
+| `httpx.HTTPStatusError` | The exception the response's status chooses, below, with neither `__cause__` nor `__context__` |
 | `httpx.TooManyRedirects` | Nothing: the SDK follows no redirect, so httpx never raises it ([Requests](#requests)) |
 
 Only a caller-supplied client's event hook raises `httpx.HTTPStatusError`,
 as a response hook that calls `raise_for_status()` does. httpx closes the
-response before the exception reaches the SDK, so its body cannot be read.
-The SDK handles that response as one without a problem body: a `4xx` or
-`5xx` raises by status (rule 2 above), with `retry_after` and `request_id`
-from its headers, and is retried as its status says
-([What is retried](#what-is-retried)); a `1xx` or `3xx` raises
-`UnexpectedResponseError`.
+response before the exception reaches the SDK, and the SDK reads no body
+from it, even one the hook read. The SDK handles that response as one
+without a problem body: a `4xx` or `5xx` raises by status (rule 2 above),
+with `retry_after` and `request_id` from its headers, and is retried as its
+status says ([What is retried](#what-is-retried)); a `1xx` or `3xx` raises
+`UnexpectedResponseError`. The `httpx.HTTPStatusError` stays out of the
+chain: it holds the whole response, and its message quotes the status line
+and any `Location` header, any of which can echo the key.
 
 Any other exception raised while the SDK sends a request or reads the
 response, such as one a caller's event hook raises, propagates unchanged
@@ -570,18 +574,28 @@ runs the call where it can abandon it, such as another thread.
   without catching an encoding error, because a `ConfigError` raised
   while handling one keeps it as its `__context__`, even with
   `from None`.
-- The key appears only in that header. It is not in `repr(client)`, in
-  any record the SDK logs, or in any exception the SDK raises: not in its
-  message, arguments, or attributes, nor in those of any exception
-  reachable from it through `__cause__` and `__context__`. An exception
-  the SDK raises for one of httpx's chains it as its `__cause__`
-  ([Exceptions from httpx](#exceptions-from-httpx)), and that exception
-  holds the request. Whenever the SDK catches an `httpx.HTTPError`, it
-  replaces the `Authorization` value with `Bearer [redacted]` on the
-  request of every httpx exception reachable from it through `__cause__`
-  and `__context__`, itself included, so an earlier attempt's failure
-  left in a chain does not keep the key either
+- The key appears only in that header. It is not in `repr(client)`, in any
+  record the SDK logs, or in any exception the SDK raises: not in its
+  message, arguments, or attributes, nor in those of any exception reachable
+  from it through `__cause__` and `__context__`. An exception the SDK raises
+  for one of httpx's chains it as its `__cause__`
+  ([Exceptions from httpx](#exceptions-from-httpx)). That exception holds
+  the request, and its message, like those of the httpcore and h11
+  exceptions beneath it, can quote a line of the response that h11 could not
+  parse, such as its status line, a header line, or a chunk header. Whenever
+  the SDK catches an `httpx.HTTPError`, it replaces the `Authorization`
+  value with `Bearer [redacted]` on the request of every httpx exception
+  reachable from it through `__cause__` and `__context__`, itself included,
+  and every occurrence of the key with `[redacted]` in every string among
+  the arguments of each exception reachable from it, so an earlier attempt's
+  failure left in a chain does not keep the key either
   ([decision 13](#decisions)).
+- The SDK chains nothing else that holds a response or its body. No
+  `httpx.HTTPStatusError`, which holds the whole response, and no exception
+  from parsing a body as JSON or [validating](#validating-responses) it,
+  which can hold the body as `json.JSONDecodeError` does, is reachable from
+  an exception the SDK raises. An exception the SDK raises after catching
+  one has neither `__cause__` nor `__context__`.
 - A response can echo the key, as a gateway's error page might. Before an
   exception or a log record holds any text the SDK takes from a response,
   the SDK replaces every occurrence of the key in it with `[redacted]`: in
@@ -885,8 +899,11 @@ it. Each can be revisited in a later version.
     throttling.
 13. **The key is redacted from httpx's chained exceptions, which are
     kept.** The chain keeps the transport detail a support engineer needs.
-    The request it holds carries the header, so the SDK redacts the header
-    rather than dropping the cause.
+    The request it holds carries the header, and its message can quote the
+    response, so the SDK redacts the key in both rather than dropping the
+    cause. An `httpx.HTTPStatusError`, or an error from parsing or
+    validating a body, is left out instead: it holds the response or its
+    body, and adds nothing a caller acts on to the SDK's exception.
 14. **The SDK has no test-control methods.** Test control belongs to the
     demo API, not to customers. The conformance runner and the scenarios
     call `/test` over HTTP.

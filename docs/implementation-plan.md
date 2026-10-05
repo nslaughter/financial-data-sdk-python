@@ -203,7 +203,12 @@ how the deadline bounds a slow response.
     [Exceptions from httpx](../spec/client.md#exceptions-from-httpx)
     says, and, on catching an `httpx.HTTPError`, `Authorization`
     redacted on the request of every httpx exception in its `__cause__`
-    and `__context__` chain, that exception included;
+    and `__context__` chain, that exception included, and the key
+    replaced in every string in the `args` of every exception there;
+  - no `httpx.HTTPStatusError`, and no exception from parsing or
+    validating a body, in the chain of an exception the SDK raises, as
+    [Credentials and logging](../spec/client.md#credentials-and-logging)
+    says;
   - `attempts` and `request_id` on every exception that has them;
   - the key replaced with `[redacted]` in any text taken from a response,
     before an exception or a log record holds it;
@@ -232,8 +237,20 @@ how the deadline bounds a slow response.
     and then raised as `TransportError`;
   - a supplied client whose response hook calls `raise_for_status()`: a
     `503` retried and then raised as `ServerError`, and a `403` problem
-    response raised as exactly `APIError`, each with the
-    `httpx.HTTPStatusError` as its `__cause__`;
+    response raised as exactly `APIError`, each with `__cause__` and
+    `__context__` `None`; and through the same hook, a `302` whose
+    `Location` and `Request-Id` hold the key, raised as
+    `UnexpectedResponseError`, and a `401` whose reason phrase and body
+    hold the key, with the hook reading the body first, raised as
+    `AuthenticationError`;
+  - a transport that raises `httpx.RemoteProtocolError` with the key in
+    its message, from an exception whose message holds the key too, as
+    httpx, httpcore, and h11 do for a header line that does not parse,
+    raised as `TransportError` with the key replaced in both;
+  - a `200` `application/json` response, and a `401` marked
+    `application/problem+json`, whose bodies hold the key but do not
+    parse as JSON, raised as `UnexpectedResponseError` and
+    `AuthenticationError` with `__cause__` and `__context__` `None`;
   - a `200` whose body is marked `Content-Encoding: gzip` but is not
     gzip, raised as `UnexpectedResponseError` with `status` 200 after
     one request;
@@ -241,9 +258,10 @@ how the deadline bounds a slow response.
     unchanged, as the same object with the same `args`, and not retried,
     with the hook called once;
   - the key absent from every exception the SDK raises, as rendered by
-    `str`, `repr`, and `traceback.format_exception`, from the request of
-    every exception in its `__cause__` and `__context__` chain, including
-    those of earlier failed attempts, and from every record the SDK logs;
+    `str`, `repr`, and `traceback.format_exception`, from the `args` of
+    every exception in its `__cause__` and `__context__` chain and the
+    request of every httpx exception there, including those of earlier
+    failed attempts, and from every record the SDK logs;
   - a response that echoes the key, in a problem member at the top level
     and nested, and in `Request-Id`, leaves only `[redacted]` in the
     exception's attributes, its `str`, and the SDK's log records;
