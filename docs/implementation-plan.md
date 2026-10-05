@@ -224,7 +224,8 @@ how the deadline bounds a slow response.
     says.
 - Tests use `httpx.MockTransport`, with the clock, the sleep, and the
   random source passed in:
-  - each row of the retry table, and each bound;
+  - each row of the retry table, with each httpx exception class it
+    names, and each bound;
   - a `Retry-After` beyond the budget on a `429` and on a `503`, which
     raise `RateLimitError` and `ServerError`, each with `retry_after` set;
   - jitter stays within its bounds and uses the random source;
@@ -257,7 +258,8 @@ how the deadline bounds a slow response.
   - a transport that raises `httpx.RemoteProtocolError` with the key in
     its message, from an exception whose message holds the key too, as
     httpx, httpcore, and h11 do for a header line that does not parse,
-    raised as `TransportError` with the key replaced in both;
+    retried, and raised as `TransportError` with `attempts` equal to
+    `max_attempts` and the key replaced in both;
   - a `200` `application/json` response, and a `401` marked
     `application/problem+json`, whose bodies hold the key but do not
     parse as JSON, raised as `UnexpectedResponseError` and

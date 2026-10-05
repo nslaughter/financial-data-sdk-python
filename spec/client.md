@@ -377,7 +377,7 @@ and nothing is missed or repeated. The contract's
 | `UnsupportedAPIVersionError(APIError)` | `404 unsupported_api_version`. |
 | `RateLimitError(APIError)` | `429`, with any code, once retries stop. |
 | `ServerError(APIError)` | Any `5xx`, with any code, once retries stop. |
-| `TransportError(FinancialDataError)` | No response arrived because connecting failed, the connection broke, or a timeout of a caller-supplied HTTP client expired while no deadline applied, once retries stop. `__cause__` is httpx's exception. |
+| `TransportError(FinancialDataError)` | httpx raised an `httpx.TransportError` other than a timeout while a deadline applied: connecting failed, the connection broke, the response could not be parsed, the request could not be sent, or a timeout of a caller-supplied HTTP client expired. Raised once retries stop ([What is retried](#what-is-retried)). `__cause__` is httpx's exception. |
 | `DeadlineExceededError(FinancialDataError, TimeoutError)` | The call's deadline passed while a request was in flight. |
 | `UnexpectedResponseError(FinancialDataError)` | A response the API's documents do not allow: a successful response that fails [validation](#validating-responses), a body that does not decode, a `1xx` or `3xx` status, or a page that breaks a pagination guarantee. |
 
@@ -471,11 +471,13 @@ retried when an attempt ends with one of these outcomes
 | `429` | Yes |
 | `500`, `502`, `503`, `504` | Yes |
 | Any other status | No |
-| Connecting failed | Yes |
-| The connection broke before the response was complete, or a timeout set on a caller-supplied client expired while no deadline applied | Yes |
-| The call's deadline passed, including an httpx timeout while a deadline applied ([Deadline](#deadline)) | No |
+| `httpx.NetworkError`: connecting failed (`ConnectError`), the connection broke while sending or reading (`WriteError`, `ReadError`), or closing it failed (`CloseError`) | Yes |
+| `httpx.RemoteProtocolError`: the server closed the connection without a complete response, or sent a response h11 could not parse, such as a malformed header line. httpx raises the same class for both, so both are retried | Yes |
+| `httpx.TimeoutException` while no deadline applies: a timeout set on a caller-supplied client expired | Yes |
+| The call's deadline passed, including an `httpx.TimeoutException` while a deadline applied ([Deadline](#deadline)) | No |
+| Any other `httpx.TransportError`: httpx refused to send the request as made (`LocalProtocolError`, `UnsupportedProtocol`), or the caller's proxy refused it (`ProxyError`). A retry would send the same request the same way | No |
 | A successful response failed validation | No |
-| A body did not decode as its `Content-Encoding` says | No |
+| `httpx.DecodingError`: a body did not decode as its `Content-Encoding` says | No |
 | Any other exception from httpx or from a caller's event hook ([Exceptions from httpx](#exceptions-from-httpx)) | No |
 
 A later version that adds a request with effects, such as creating an
@@ -908,7 +910,10 @@ it. Each can be revisited in a later version.
 11. **Only `GET` is retried, on 429, 500, 502, 503, 504, and connection
     failures.** These are the transient outcomes, and every other status
     would repeat. The API's `500 internal` describes an unexpected failure,
-    and a `GET` is safe to repeat.
+    and a `GET` is safe to repeat. httpx raises `RemoteProtocolError` both
+    for a connection closed without a response and for a response it could
+    not parse, so both are retried. A request httpx refuses to send, or a
+    proxy refuses, would fail the same way again, and is not.
 12. **Retry defaults: 4 attempts, 30 s of waiting, backoff from 0.5 s
     doubling to 8 s with full jitter, and `Retry-After` used as given.** A
     call that meets a brief outage succeeds within a few seconds and fails
