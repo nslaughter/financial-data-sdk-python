@@ -524,25 +524,34 @@ The deadline bounds each wait on the network, not each attempt as a whole
   the attempt begins. httpx applies it separately to waiting for a pooled
   connection, connecting, sending, and each read.
 - The SDK reads the response as a stream. It checks the deadline when the
-  headers have arrived and after each chunk of the body. At the first check
-  that finds the deadline passed, it closes the response and raises
-  `DeadlineExceededError`, even if the body is complete.
+  headers have arrived and after each chunk of the body that httpx returns.
+  At the first check that finds the deadline passed, it closes the response
+  and raises `DeadlineExceededError`, even if the body is complete.
 - An httpx timeout during an attempt that has a deadline also raises
   `DeadlineExceededError`, with httpx's exception as its `__cause__`. Each
   of the attempt's timeouts is the time that remained when it began, so
   when one expires, the deadline has passed.
 - After `DeadlineExceededError`, the SDK does not retry.
 
-Once a response's headers have arrived, a call therefore raises within one
-read of its deadline: at most the time that remained when its last attempt
-began. Before they arrive, httpx waits for a connection, connects, sends,
+The SDK sees the body only as httpx returns it, and httpx can make several
+reads, each bounded by the attempt's timeout, before it returns anything.
+From an HTTP/1.1 body framed by `Content-Length` and not compressed, it
+returns the bytes of each read at once, so once such a response's headers
+have arrived, a call raises within one read of its deadline: at most the
+time that remained when its last attempt began. From any other body it can
+return nothing for several reads: for a chunked body's framing, such as a
+chunk's size line and the trailers, and for compressed bytes that do not
+yet decode to anything, such as a gzip header. A response that sends those
+slowly can run past the deadline by as many reads as they take.
+
+Before the headers arrive, httpx waits for a connection, connects, sends,
 and reads the headers without returning to the SDK, so an attempt can run
 past the deadline by several such waits, and a server that sends its
 headers a few bytes at a time can hold it longer still. httpx also runs a
 caller-supplied client's event hooks before `send()` returns, so a
 response hook that reads the body reads it before the SDK's first check.
-httpx does not time out resolving the API's host name. A caller who needs a hard bound
-runs the call where it can abandon it, such as another thread.
+httpx does not time out resolving the API's host name. A caller who needs a
+hard bound runs the call where it can abandon it, such as another thread.
 
 ## Requests
 

@@ -185,7 +185,7 @@ added. Its action is one of these:
 | `problem` | Answers with the given status as `application/problem+json`, with the body `{"status": <status>, "code": <code>, "title": "Injected fault", "detail": "Injected by the fault proxy.", "parameter": <parameter or null>}`, and any given headers. |
 | `drop` | Reads the request, then closes the connection without a response. |
 | `stall` | Reads the request and sends nothing, until the client closes the connection or the scenario ends. |
-| `trickle` | Forwards the request, then sends the API's status and headers at once, and its body the given number of bytes at a time, with the given interval before each. |
+| `trickle` | Forwards the request, then sends the API's status and headers at once, and its body the given number of bytes at a time, with the given interval before each. The body is the API's content, decoded, and framed by `Content-Length` without `Transfer-Encoding` or `Content-Encoding`, so that httpx returns each part as it arrives ([deadline](client.md#deadline)). |
 | `rewrite` | Forwards the request, then answers with the API's response, its body parsed, changed by the given function, and serialized again. |
 
 The proxy records every request it receives (method, path, query, headers,
@@ -830,7 +830,7 @@ cutoff up to its last sync.
 | The caller controls concurrency and cleanup | `iteration-is-lazy`; leaving the block normally, by an exception, and after an iterator stopped early, in plan step 4's unit tests |
 | Pages and tokens are available alongside a record iterator, and a job saves both in one transaction | `resume-after-interrupted-download`, `scheduled-job-resumes`; that a failure between a page's revisions and its checkpoint saves neither, in plan step 10's tests, since these scenarios fail only between transactions |
 | Pagination stays on one snapshot; an expired snapshot is reported as requiring a restart | `snapshot-kept-across-a-revision`, `pages-must-share-a-snapshot`, `resume-after-snapshot-expiry` |
-| `Retry-After` in both forms; the caller's deadline covers retry waits and bounds each wait on the network; only safe reads are retried | `retry-after-seconds`, `retry-after-http-date`, `retry-after-invalid`, `deadline-during-request`, `deadline-during-slow-body`, `deadline-bounds-backoff`; only `GET` exists at stage 1 |
+| `Retry-After` in both forms; the caller's deadline covers retry waits and bounds each wait on the network; only safe reads are retried | `retry-after-seconds`, `retry-after-http-date`, `retry-after-invalid`, `deadline-during-request`, `deadline-during-slow-body`, `deadline-bounds-backoff`; a chunked body whose framing arrives slowly, in plan step 3's unit tests; only `GET` exists at stage 1 |
 | Errors carry the provider's request ID and omit the credential | `request-id-from-any-response`, `request-id-from-the-api`, `key-absent-from-errors-and-logs`; a malformed key's `ConfigError` in plan step 1's tests; the key in a hook's `httpx.HTTPStatusError`, in the message of a response httpx could not parse, and in a body that does not parse as JSON, in plan step 3's tests |
 | Customers can supply their own transport | `custom-http-client`; the SDK runner's recording client |
 | Logging without global handlers | Plan step 3's unit tests; `key-absent-from-errors-and-logs` |

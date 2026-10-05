@@ -230,6 +230,14 @@ how the deadline bounds a slow response.
   - a body whose chunks move the clock past the deadline, refused at the
     first check after it, even when the body is complete, with the
     response closed and `__cause__` `None`;
+  - with a local stub server on `127.0.0.1`, because
+    `httpx.MockTransport` bypasses httpcore's framing, and each read
+    shorter than the attempt's timeout: a body framed by `Content-Length`
+    and sent one byte at a time raises `DeadlineExceededError` within one
+    read of the deadline; a chunked body whose first size line is sent one
+    byte at a time until after the deadline raises it once httpx returns
+    that chunk's data, within one read of it, as
+    [Deadline](../spec/client.md#deadline) says;
   - an httpx timeout during an attempt with a deadline, raised as
     `DeadlineExceededError` with httpx's exception as its `__cause__`, and
     not retried;
