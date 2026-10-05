@@ -161,7 +161,7 @@ the API's defaults apply ([decision 5](#decisions)).
 
 | Argument | Accepted | Sent as |
 | --- | --- | --- |
-| `series_id`, `dataset_id` | A non-empty `str` | In a path, percent-encoded with no safe characters, so `/` is encoded too. In a query, exactly as given. |
+| `series_id`, `dataset_id` | A `str` other than `""`, `"."`, and `".."` | In a path, percent-encoded with no safe characters, so `/` is encoded too. In a query, exactly as given. |
 | `period_start`, `period_end` | A `datetime.date` that is not a `datetime`, or a `str` | `YYYY-MM-DD` for a `date`. A `str` exactly as given. |
 | `available_as_of` | A timezone-aware `datetime`, or a `str` | For a `datetime`: converted to UTC, truncated to whole seconds, and written `YYYY-MM-DDTHH:MM:SSZ`. A `str` exactly as given. |
 | `page_size`, `limit`, `after` | An `int` that is not a `bool` | Decimal digits, with `-` if negative. |
@@ -169,9 +169,11 @@ the API's defaults apply ([decision 5](#decisions)).
 
 - Before sending anything, the SDK checks only types and the two inputs it
   cannot send faithfully. A wrong type raises `TypeError`. A naive
-  `datetime` raises `ValueError`, because its instant is unknown. An empty
-  `series_id` or `dataset_id` raises `ValueError`, because it would address
-  a different path.
+  `datetime` raises `ValueError`, because its instant is unknown. A
+  `series_id` or `dataset_id` that is empty, `.`, or `..` raises
+  `ValueError`, because in a path it would address a different one:
+  percent-encoding leaves `.` unchanged, and httpx removes `.` and `..`
+  segments, so `/v1/series/..` becomes `/v1`.
 - Everything else is the API's to judge, including a malformed date string,
   a page size out of range, a reversed period, and a cutoff after the API's
   clock. The SDK sends the request and raises the API's error

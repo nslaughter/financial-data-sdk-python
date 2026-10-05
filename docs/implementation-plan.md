@@ -170,6 +170,8 @@ raise `NotImplementedError`.
     wrong JSON type, `null` where it is not allowed, a value that is not a
     string, a fractional or boolean integer, and dates and timestamps in
     every malformed form the API's `request-errors` file uses;
+  - `""`, `"."`, and `".."` refused as a `series_id` or `dataset_id` with
+    `ValueError`, and a path ID with `/` percent-encoded;
   - values such as `102.0`, `0.0000001`, `-0`, and
     `12345678901234567890.123` keep their text through
     `format(value, "f")`;

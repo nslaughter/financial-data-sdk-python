@@ -68,7 +68,8 @@ its references are resolved. Otherwise the runner sends it over HTTP,
 exactly as the API runner does.
 
 1. Its method is `GET`, and its path matches a row of the table below
-   exactly: path parameters are non-empty, and there is no trailing slash.
+   exactly: path parameters are neither empty nor `.` or `..`, and there is
+   no trailing slash.
 2. It has no `authorization` member, and its `credential` is absent or
    names a customer credential.
 3. Every member of its `query` is an argument of the row's method, every
