@@ -354,6 +354,11 @@ Follows D2 and D6. Waits for the same image as step 8.
   `contract/expected/` against its offline selection. Each result must
   match. Test `complete_from`, including the null one of a load that saved
   nothing, and the refusal of cutoffs outside the range.
+- Tests of `sync` with the SDK on `httpx.MockTransport`: a saved page token
+  refused as `page_token_expired` or `invalid_page_token`, and a saved
+  position refused as `position_expired` or `position_ahead`, each restart
+  the load from the first page in the same run, keep the rows already
+  saved, and exit with status 0.
 - Turn on `research-example`, `scheduled-job-resumes`,
   `scheduled-job-follows-updates`, and `scheduled-job-starts-empty`. CI
   runs them from a clean virtual environment with the wheel and its

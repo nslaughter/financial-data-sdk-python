@@ -637,16 +637,23 @@ query, follows the change stream, and answers cutoff queries offline.
    `following`, at the query's position. A query without a cutoff matches
    the state at its position, so the stream continues from there
    ([positions][api-positions]).
-   If the saved token has expired (`PageTokenExpiredError`), the load
-   restarts from the first page. Rows already saved stay, because a
-   revision never changes, but `complete_from` is computed again from the
-   new load.
+   If the API no longer accepts the saved token, because it has expired
+   (`PageTokenExpiredError`) or was issued before the API last restarted or
+   reset (`PageTokenError` with code `invalid_page_token`), the load
+   restarts from the first page in the same run. Rows already saved stay,
+   because a revision never changes, but `complete_from` is computed again
+   from the new load.
 3. **Following.** Reads `client.changes.pages(dataset_id, after=position)`.
    For each page, one transaction saves its revisions of the series and its
-   `next_position`. A `PositionExpiredError` returns the job to loading.
+   `next_position`. A `PositionExpiredError`, or a `PositionAheadError`
+   because the API was reset to an earlier clock, returns the job to
+   loading, and the run continues with a new load from the first page.
+   Rows already saved stay, as above. After a reset to an earlier clock,
+   some may not be available yet; their `available_at` is later than any
+   cutoff the copy answers, so selection never takes them.
 4. When caught up, saves the `server_time` from step 1 as `synced_at` and
    exits with status 0.
-5. On any `FinancialDataError`, prints what this run saved (pages and
+5. On any other `FinancialDataError`, prints what this run saved (pages and
    records), the token or position the next run resumes from, and the
    error's class, code, and request ID, then exits with status 1. Running
    `sync` again resumes.
