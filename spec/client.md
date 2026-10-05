@@ -56,8 +56,10 @@ has no method for them, and they do not change its records or errors.
 D7 adds a `Request-Id` response header to the API in contract version
 0.4.0, which is not yet written. The SDK reads the header from any response
 that carries one, so it works unchanged against 0.3.0, where the value is
-always `None`. This document assumes 0.4.0 names the header `Request-Id`; if
-it names another, this document changes first.
+always `None`. This document assumes 0.4.0 names the header `Request-Id`.
+Moving the SDK to 0.4.0 needs a new version of this document that pins the
+new tag (D5), approved by the operator before plan step 11; that version
+also renames the header if 0.4.0 names it differently.
 
 ## Scope
 

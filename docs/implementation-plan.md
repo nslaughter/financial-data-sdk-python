@@ -54,7 +54,9 @@ What each step that cannot start yet needs:
   That step itself waits on the operator's choice of image name and tag
   scheme.
 - **Step 11** needs contract version 0.4.0 with the `Request-Id` header
-  (D7), tagged in financial-data-api, and an image that implements it.
+  (D7), tagged in financial-data-api, an image that implements it, and an
+  operator-approved version of the specifications that pins it, since D5
+  pins 0.3.0.
 
 If the operator changes an owner specification, the scenarios that name it
 may need to change. That change is a new version of the specification, made
@@ -377,8 +379,11 @@ Follows D2 and D6. Waits for the same image as step 8.
 
 Follows D7. Before this step starts, financial-data-api tags
 `contract-v0.4.0` with the `Request-Id` header and publishes an image that
-implements it, and the operator records both here. If 0.4.0 names the
-header differently, the client contract changes first, in a new version.
+implements it, and the operator records both here. The operator also
+approves a new version of `spec/client.md` and `spec/conformance.md` that
+pins `contract-v0.4.0`: D5 and the documents' links name 0.3.0, and this
+step cannot change `spec/`. That version also renames the header if 0.4.0
+names it differently.
 
 - Replace `contract/` with the files of `contract-v0.4.0`, and update
   `CONTRACT.json`, including the image. This step may change `contract/`.
