@@ -564,18 +564,24 @@ runs the call where it can abandon it, such as another thread.
   `!` to `~` (0x21 to 0x7E), so it has no whitespace or control character,
   can only appear in the `Authorization` header, and encodes there without
   error; otherwise the constructor raises `ConfigError`, whose message does
-  not repeat the value. httpx would refuse a non-ASCII key with a
-  `UnicodeEncodeError` that holds the whole header value, key included.
+  not repeat the value and whose `__cause__` and `__context__` are `None`.
+  httpx would refuse a non-ASCII key with a `UnicodeEncodeError` that
+  holds the whole header value, key included, and so would
+  `api_key.encode("ascii")`. The SDK therefore checks the characters
+  without catching an encoding error, because a `ConfigError` raised
+  while handling one keeps it as its `__context__`, even with
+  `from None`.
 - The key appears only in that header. It is not in any exception's
   message, arguments, or attributes, in `repr(client)`, or in any record
-  the SDK logs. An exception the SDK raises for one of httpx's chains it as its
-  `__cause__` ([Exceptions from httpx](#exceptions-from-httpx)), and that
-  exception holds the request. Before any exception leaves an SDK call,
-  whether the SDK raised it or let it propagate, the SDK replaces the
-  `Authorization` value with `Bearer [redacted]` on the request of every
-  httpx exception reachable from it through `__cause__` and `__context__`,
-  itself included, so an earlier attempt's failure left in the chain does
-  not keep the key either ([decision 13](#decisions)).
+  the SDK logs. An exception the SDK raises for one of httpx's chains it
+  as its `__cause__` ([Exceptions from httpx](#exceptions-from-httpx)),
+  and that exception holds the request. Before any exception leaves an
+  SDK call, whether the SDK raised it or let it propagate, the SDK
+  replaces the `Authorization` value with `Bearer [redacted]` on the
+  request of every httpx exception reachable from it through `__cause__`
+  and `__context__`, itself included, so an earlier attempt's failure
+  left in the chain does not keep the key either
+  ([decision 13](#decisions)).
 - A response can echo the key, as a gateway's error page might. Before an
   exception or a log record holds any text the SDK takes from a response,
   the SDK replaces every occurrence of the key in it with `[redacted]`: in

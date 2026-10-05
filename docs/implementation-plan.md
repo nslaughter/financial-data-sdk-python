@@ -137,7 +137,9 @@ and the types, and D5 for the contract.
 - Tests:
   - each invalid setting raises `ConfigError`, whose message does not
     contain a key it was given, including keys with a space, a control
-    character, and a non-ASCII character such as `“demo-research-key”`;
+    character, and a non-ASCII character such as `“demo-research-key”`.
+    For a key, the `ConfigError`'s `__cause__` and `__context__` are
+    `None`, and the key is in neither its `repr` nor its `args`;
   - records are frozen, and `Revision`'s fields are in the order of the
     keys of the first record in `contract/fixtures/revisions.json`;
   - every public name is importable from the top level and listed in

@@ -830,7 +830,7 @@ cutoff up to its last sync.
 | Pages and tokens are available alongside a record iterator, and a job saves both in one transaction | `resume-after-interrupted-download`, `scheduled-job-resumes`; that a failure between a page's revisions and its checkpoint saves neither, in plan step 10's tests, since these scenarios fail only between transactions |
 | Pagination stays on one snapshot; an expired snapshot is reported as requiring a restart | `snapshot-kept-across-a-revision`, `pages-must-share-a-snapshot`, `resume-after-snapshot-expiry` |
 | `Retry-After` in both forms; the caller's deadline covers retry waits and bounds each wait on the network; only safe reads are retried | `retry-after-seconds`, `retry-after-http-date`, `retry-after-invalid`, `deadline-during-request`, `deadline-during-slow-body`, `deadline-bounds-backoff`; only `GET` exists at stage 1 |
-| Errors carry the provider's request ID and omit the credential | `request-id-from-any-response`, `request-id-from-the-api`, `key-absent-from-errors-and-logs` |
+| Errors carry the provider's request ID and omit the credential | `request-id-from-any-response`, `request-id-from-the-api`, `key-absent-from-errors-and-logs`; a malformed key's `ConfigError` in plan step 1's tests |
 | Customers can supply their own transport | `custom-http-client`; the SDK runner's recording client |
 | Logging without global handlers | Plan step 3's unit tests; `key-absent-from-errors-and-logs` |
 | Dataframe support is optional and keeps revision information | `dataframe-keeps-revision-information`; plan step 5's test without pandas |
