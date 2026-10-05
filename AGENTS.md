@@ -48,7 +48,9 @@ The README describes the project for people; it is not a specification.
 - **Nothing but localhost in tests.** Unit tests use `httpx.MockTransport`
   or a local stub. The shared checks and scenarios use the pinned image and
   the fault proxy on localhost. Only `scripts/check_contract.py` fetches
-  from GitHub, and only CI pulls the image.
+  from GitHub. Test code never pulls the image: CI pulls it, and to verify
+  a step locally you start it with the `docker run` in
+  [Commands](#commands), which pulls it if needed.
 - **Nothing outside this repository.** Do not open issues, post comments,
   or push to financial-data-api or any other project unless the operator
   asks. A change the SDK needs from the API, such as D7's `Request-Id`
