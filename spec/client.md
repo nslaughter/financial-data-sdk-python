@@ -504,10 +504,12 @@ step 3 waits for the answer.
 
 - The key comes from `api_key` or, when that is `None`, from
   `FINANCIAL_DATA_API_KEY`. A variable set to an empty value counts as
-  unset. The key must be a non-empty string without whitespace or control
-  characters, so it can only appear in the `Authorization` header;
-  otherwise the constructor raises `ConfigError`, whose message does not
-  repeat the value.
+  unset. The key must be a non-empty string of visible ASCII characters,
+  `!` to `~` (0x21 to 0x7E), so it has no whitespace or control character,
+  can only appear in the `Authorization` header, and encodes there without
+  error; otherwise the constructor raises `ConfigError`, whose message does
+  not repeat the value. httpx would refuse a non-ASCII key with a
+  `UnicodeEncodeError` that holds the whole header value, key included.
 - The key appears only in that header. It is not in any exception's
   message, arguments, or attributes, in `repr(client)`, or in any log
   record. A `TransportError` or `DeadlineExceededError` chains httpx's

@@ -137,7 +137,8 @@ and the types, and D5 for the contract.
   and giving a `repr` without the key.
 - Tests:
   - each invalid setting raises `ConfigError`, whose message does not
-    contain a key it was given;
+    contain a key it was given, including keys with a space, a control
+    character, and a non-ASCII character such as `“demo-research-key”`;
   - records are frozen, and `Revision`'s fields are in the order of the
     keys of the first record in `contract/fixtures/revisions.json`;
   - every public name is importable from the top level and listed in
