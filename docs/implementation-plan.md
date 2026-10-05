@@ -240,8 +240,8 @@ how the deadline bounds a slow response.
     shorter than the attempt's timeout: a body framed by `Content-Length`
     and sent one byte at a time raises `DeadlineExceededError` within one
     read of the deadline; a chunked body whose first size line is sent one
-    byte at a time until after the deadline raises it once httpx returns
-    that chunk's data, within one read of it, as
+    byte at a time until after the deadline raises it when httpx returns
+    that chunk's data, the first check after the deadline, as
     [Deadline](../spec/client.md#deadline) says;
   - an httpx timeout during an attempt with a deadline, raised as
     `DeadlineExceededError` with httpx's exception as its `__cause__`, and
