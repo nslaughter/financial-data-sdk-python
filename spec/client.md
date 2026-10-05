@@ -426,9 +426,8 @@ from its headers, and is retried as its status says
 
 Any other exception raised while the SDK sends a request or reads the
 response, such as one a caller's event hook raises, propagates unchanged
-and is not retried, once the SDK has redacted the `Authorization` header
-on every httpx request in its chain
-([Credentials and logging](#credentials-and-logging)).
+and is not retried. The SDK did not raise it, so the promise about the key
+in [Credentials and logging](#credentials-and-logging) does not cover it.
 
 ### Attributes
 
@@ -571,16 +570,17 @@ runs the call where it can abandon it, such as another thread.
   without catching an encoding error, because a `ConfigError` raised
   while handling one keeps it as its `__context__`, even with
   `from None`.
-- The key appears only in that header. It is not in any exception's
-  message, arguments, or attributes, in `repr(client)`, or in any record
-  the SDK logs. An exception the SDK raises for one of httpx's chains it
-  as its `__cause__` ([Exceptions from httpx](#exceptions-from-httpx)),
-  and that exception holds the request. Before any exception leaves an
-  SDK call, whether the SDK raised it or let it propagate, the SDK
+- The key appears only in that header. It is not in `repr(client)`, in
+  any record the SDK logs, or in any exception the SDK raises: not in its
+  message, arguments, or attributes, nor in those of any exception
+  reachable from it through `__cause__` and `__context__`. An exception
+  the SDK raises for one of httpx's chains it as its `__cause__`
+  ([Exceptions from httpx](#exceptions-from-httpx)), and that exception
+  holds the request. Whenever the SDK catches an `httpx.HTTPError`, it
   replaces the `Authorization` value with `Bearer [redacted]` on the
   request of every httpx exception reachable from it through `__cause__`
   and `__context__`, itself included, so an earlier attempt's failure
-  left in the chain does not keep the key either
+  left in a chain does not keep the key either
   ([decision 13](#decisions)).
 - A response can echo the key, as a gateway's error page might. Before an
   exception or a log record holds any text the SDK takes from a response,
@@ -589,6 +589,11 @@ runs the call where it can abandon it, such as another thread.
   `detail`, `parameter`, `problem`, and `str(error)`; in `Request-Id`; and
   in anything else taken from the response. Keeping the key out comes
   before keeping the response's text exact.
+- An exception the caller's own code raises, such as one from an event
+  hook on a client the caller supplied, propagates unchanged
+  ([Exceptions from httpx](#exceptions-from-httpx)), and the promises
+  above about exceptions do not cover it: the SDK did not create it, and
+  an event hook sees each request with its `Authorization` header.
 - Logging uses `logging.getLogger("financial_data")`. The SDK adds no
   handler, sets no level, and never calls `logging.basicConfig`. It logs
   each attempt at `DEBUG`, with the method, path, attempt number, status or

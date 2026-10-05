@@ -127,7 +127,7 @@ which version the provider could deliver by the cutoff, so the query returns
   can run past it. Only reads that are safe to repeat are retried.
 - **Errors are traceable and omit secrets.** Errors include the provider's
   request ID, which the demo API adds to its responses in contract version
-  0.4.0. Neither errors nor the SDK's logs contain the credential.
+  0.4.0. Neither the SDK's errors nor its logs contain the credential.
 - **The client fits the application around it.** Customers can supply their
   own `httpx.Client` for connection requirements or test fixtures. Logging uses the
   standard library without installing global handlers. Dataframe support is an

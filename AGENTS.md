@@ -79,14 +79,15 @@ The README describes the project for people; it is not a specification.
 - Read each response as a stream, and check the deadline when its headers
   arrive and after each chunk of its body (D9). httpx's timeouts bound
   each socket operation, not the whole response.
-- Never format a request's headers into a message or a log record. Before
-  any exception leaves a call, including one the SDK did not raise, redact
-  the `Authorization` header on the request of every httpx exception in
-  its `__cause__` and `__context__` chain, itself included, not only the
-  direct cause. Replace the key with `[redacted]` in any text taken from a
-  response, such as a problem body or `Request-Id`, before an exception or
-  a log record holds it. Tests search every rendering of an exception and
-  every record the SDK logs for the key itself.
+- Never format a request's headers into a message or a log record. On
+  catching an `httpx.HTTPError`, redact the `Authorization` header on the
+  request of every httpx exception in its `__cause__` and `__context__`
+  chain, itself included, not only the direct cause. Replace the key with
+  `[redacted]` in any text taken from a response, such as a problem body
+  or `Request-Id`, before an exception or a log record holds it. Let an
+  exception the caller's code raises propagate unchanged. Tests search
+  every rendering of an exception the SDK raises and every record the SDK
+  logs for the key itself.
 - Logging uses `logging.getLogger("financial_data")` with `%`-style
   arguments, at `DEBUG` and `INFO` only, with no handlers.
 - Iterators are generators that hold no open response: read each response

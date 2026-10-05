@@ -201,9 +201,9 @@ how the deadline bounds a slow response.
     [Deadline](../spec/client.md#deadline) says;
   - each httpx exception raised as the SDK's own, as
     [Exceptions from httpx](../spec/client.md#exceptions-from-httpx)
-    says, and `Authorization` redacted on the request of every httpx
-    exception in the `__cause__` and `__context__` chain of any
-    exception that leaves a call, that exception included;
+    says, and, on catching an `httpx.HTTPError`, `Authorization`
+    redacted on the request of every httpx exception in its `__cause__`
+    and `__context__` chain, that exception included;
   - `attempts` and `request_id` on every exception that has them;
   - the key replaced with `[redacted]` in any text taken from a response,
     before an exception or a log record holds it;
@@ -238,11 +238,12 @@ how the deadline bounds a slow response.
     gzip, raised as `UnexpectedResponseError` with `status` 200 after
     one request;
   - an exception a supplied client's request hook raises, propagated
-    unchanged and not retried, with the hook called once;
-  - the key absent from every exception, as rendered by `str`, `repr`, and
-    `traceback.format_exception`, from the request of every exception in
-    its `__cause__` and `__context__` chain, including those of earlier
-    failed attempts, and from every record the SDK logs;
+    unchanged, as the same object with the same `args`, and not retried,
+    with the hook called once;
+  - the key absent from every exception the SDK raises, as rendered by
+    `str`, `repr`, and `traceback.format_exception`, from the request of
+    every exception in its `__cause__` and `__context__` chain, including
+    those of earlier failed attempts, and from every record the SDK logs;
   - a response that echoes the key, in a problem member at the top level
     and nested, and in `Request-Id`, leaves only `[redacted]` in the
     exception's attributes, its `str`, and the SDK's log records;
