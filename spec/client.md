@@ -536,9 +536,9 @@ began. Before they arrive, httpx waits for a connection, connects, sends,
 and reads the headers without returning to the SDK, so an attempt can run
 past the deadline by several such waits, and a server that sends its
 headers a few bytes at a time can hold it longer still. httpx also runs a
-caller-supplied client's event hooks before it returns, so a response hook
-that reads the body reads it before the SDK's first check. httpx does not
-time out resolving the API's host name. A caller who needs a hard bound
+caller-supplied client's event hooks before `send()` returns, so a
+response hook that reads the body reads it before the SDK's first check.
+httpx does not time out resolving the API's host name. A caller who needs a hard bound
 runs the call where it can abandon it, such as another thread.
 
 ## Requests
@@ -597,9 +597,10 @@ runs the call where it can abandon it, such as another thread.
   `WARNING` or above, so a program that has not configured logging prints
   nothing.
 - httpx and httpcore log through their own loggers, `httpx` and
-  `httpcore`, which the SDK neither configures nor filters, so the
-  guarantees above cover only the SDK's own records. Neither logs a
-  request's headers, so the `Authorization` header does not reach them.
+  `httpcore`, which the SDK neither configures nor filters, so what this
+  section promises about log records covers only the SDK's own. Neither
+  logs a request's headers, so the `Authorization` header does not reach
+  them.
   They do log what a response sends before the SDK sees it: httpx its
   status line at `INFO`, and httpcore its status line and headers at
   `DEBUG`. A response that echoes the key there, as a gateway's might,
