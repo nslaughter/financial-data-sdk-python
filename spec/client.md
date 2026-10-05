@@ -511,9 +511,12 @@ step 3 waits for the answer.
 - The key appears only in that header. It is not in any exception's
   message, arguments, or attributes, in `repr(client)`, or in any log
   record. A `TransportError` or `DeadlineExceededError` chains httpx's
-  exception as its `__cause__`, and that exception holds the request, so
-  the SDK replaces the request's `Authorization` value with
-  `Bearer [redacted]` before raising ([decision 13](#decisions)).
+  exception as its `__cause__`, and that exception holds the request.
+  Before raising any exception, the SDK replaces the `Authorization` value
+  with `Bearer [redacted]` on the request of every httpx exception
+  reachable from it through `__cause__` and `__context__`, so an earlier
+  attempt's failure left in the chain does not keep the key either
+  ([decision 13](#decisions)).
 - A response can echo the key, as a gateway's error page might. Before an
   exception or a log record holds any text the SDK takes from a response,
   the SDK replaces every occurrence of the key in it with `[redacted]`: in

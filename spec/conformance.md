@@ -623,10 +623,12 @@ request still carries it.
    the rules.
 7. For each exception raised above, `demo-research-key` does not occur in
    its `str`, its `repr`, the `repr` of its `args` and of each attribute
-   the client contract lists, or `traceback.format_exception` of it. For
-   the `TransportError` and the `DeadlineExceededError`, the
-   `Authorization` header of the request their `__cause__` holds is
-   `Bearer [redacted]`.
+   the client contract lists, or `traceback.format_exception` of it.
+   Following its `__cause__` and `__context__` to the end of the chain,
+   every httpx exception that holds a request has
+   `Authorization: Bearer [redacted]` on it. The chains of the
+   `TransportError`, which follows three dropped connections, and of the
+   `DeadlineExceededError` hold at least one such request.
 8. `demo-research-key` occurs in no captured record's message, arguments,
    or attributes, and not in `repr(client)`. The captured records include
    two `INFO` retry records from step 3.

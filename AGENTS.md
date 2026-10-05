@@ -74,9 +74,10 @@ The README describes the project for people; it is not a specification.
   source in, so their rules can be tested directly and deterministically.
 - Deadlines and waits use `time.monotonic()`. Only a `Retry-After` date is
   compared with `datetime.now(UTC)`.
-- Never format a request's headers into a message or a log record. Redact
-  the `Authorization` header on httpx's request before chaining its
-  exception. Replace the key with `[redacted]` in any text taken from a
+- Never format a request's headers into a message or a log record. Before
+  raising, redact the `Authorization` header on the request of every httpx
+  exception in the `__cause__` and `__context__` chain, not only the direct
+  cause. Replace the key with `[redacted]` in any text taken from a
   response, such as a problem body or `Request-Id`, before an exception or
   a log record holds it. Tests search every rendering of an exception and
   every log record for the key itself.

@@ -195,8 +195,9 @@ changes the step's status to `Not started`.
   - the three bounds.
 - In `_transport.py`, one call:
   - each attempt runs with an httpx timeout equal to the time remaining;
-  - `DeadlineExceededError`, and `TransportError` with the cause's
-    `Authorization` redacted;
+  - `DeadlineExceededError` and `TransportError`, with `Authorization`
+    redacted on the request of every httpx exception in the raised
+    exception's `__cause__` and `__context__` chain;
   - `attempts` and `request_id` on every exception that has them;
   - the key replaced with `[redacted]` in any text taken from a response,
     before an exception or a log record holds it;
@@ -216,8 +217,9 @@ changes the step's status to `Not started`.
   - `Retry-After` in each form;
   - the deadline passing during a request, and before a wait;
   - the key absent from every exception, as rendered by `str`, `repr`, and
-    `traceback.format_exception`, from its chained cause's request, and
-    from every log record;
+    `traceback.format_exception`, from the request of every exception in
+    its `__cause__` and `__context__` chain, including those of earlier
+    failed attempts, and from every log record;
   - a response that echoes the key, in a problem member at the top level
     and nested, and in `Request-Id`, leaves only `[redacted]` in the
     exception's attributes, its `str`, and the log records;
