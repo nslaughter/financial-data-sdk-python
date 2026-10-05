@@ -362,8 +362,10 @@ step's status changes to `Not started`.
 
 Waits for the same image as step 8.
 
-- Add a CI job that starts the image and runs `tests/scenarios` from the
-  installed wheel on every supported Python version.
+- Add a CI job that, on every supported Python version, starts the image,
+  installs the built wheel with its `pandas` extra in a clean virtual
+  environment, and runs `tests/scenarios` from it.
+  `dataframe-keeps-revision-information` needs the extra.
 - `enabled.txt` lists every scenario except those under **Examples** and
   `request-id-from-the-api`.
 - Done when they pass.
@@ -432,12 +434,12 @@ names it differently.
 Follows D8.
 
 - A release workflow, triggered by a `v<version>` tag, that on every
-  supported Python version builds the distribution, installs the wheel in
-  a clean virtual environment, and runs the unit tests, the shared checks,
-  the scenarios, and the examples against the pinned image. It then
-  creates a GitHub release with the wheel and the source distribution
-  attached. The repository owner pushes the tag; the pull request adds the
-  workflow only.
+  supported Python version builds the distribution, installs the wheel
+  with its `pandas` extra in a clean virtual environment, and runs the
+  unit tests, the shared checks, the scenarios, and the examples against
+  the pinned image. It then creates a GitHub release with the wheel and
+  the source distribution attached. The repository owner pushes the tag;
+  the pull request adds the workflow only.
 - Update the README's status, add a quickstart that installs from the
   release URL and starts the pinned image, and link `docs/types.md`. The README's stage 4 section names the change only
   once the operator settles that open question.
