@@ -439,6 +439,10 @@ Follows D2 and D6. Waits for the same image as step 8.
   the default clock, a reset of the API to `2025-06-10T00:00:00Z` and a
   failure on the reload's second page, which holds `rev_may25_1`, make
   `query` refuse the June 10, 2025 cutoff instead of leaving May out.
+- Tests of `sync`'s options: a later run without `--series` or
+  `--page-size` loads with the saved ones, and one that gives a different
+  series or page size from the saved ones exits with a non-zero status
+  before any request, leaving the database unchanged.
 - Tests that each page's transaction is atomic, for a query page and for a
   change page: a failure injected after the page's revisions are written
   and before its checkpoint is, such as a SQLite trigger that aborts the

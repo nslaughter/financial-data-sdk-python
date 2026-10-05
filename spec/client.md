@@ -724,7 +724,7 @@ query, follows the change stream, and answers cutoff queries offline.
 
 | Command | Effect |
 | --- | --- |
-| `sync --db PATH [--series SERIES_ID] [--page-size N]` | Loads, resumes, or updates the local copy, then exits. The series defaults to `activity-index` and the page size to 100. |
+| `sync --db PATH [--series SERIES_ID] [--page-size N]` | Loads, resumes, or updates the local copy, then exits. On a database without a checkpoint, the series defaults to `activity-index` and the page size to 100; later runs use the saved ones ([below](#sync)). |
 | `query --db PATH --as-of TIMESTAMP [--period-start DATE] [--period-end DATE]` | Answers a cutoff query from the local copy, without the API. |
 | `status --db PATH` | Prints the checkpoint. |
 
@@ -734,11 +734,19 @@ query, follows the change stream, and answers cutoff queries offline.
   14 fields. `value` is stored as the API's text in a `TEXT` column, never
   as `REAL`. Rows are inserted with `INSERT OR IGNORE`, so a page received
   twice changes nothing.
-- `checkpoint` holds one row: the series and its dataset, the query's
-  arguments, the stage (`loading` or `following`), the saved page token,
-  the position, `complete_from`, and `synced_at`.
+- `checkpoint` holds one row: the series and its dataset, the page size,
+  the stage (`loading` or `following`), the saved page token, the
+  position, `complete_from`, and `synced_at`.
 
 #### `sync`
+
+A run on a database without a checkpoint saves the series and page size it
+is given, or their defaults. Every later run loads with the saved ones, so
+a resumed load sends the arguments its page token is bound to
+([pagination][api-pagination]). A later run that omits `--series` or
+`--page-size` uses the saved value; one that gives a different value names
+the saved one and exits with a non-zero status before it sends any
+request. A different series or page size needs a new database.
 
 1. Reads `client.meta()` and keeps its `server_time`.
 2. **Loading.** Without a saved page token, it starts the query, without a

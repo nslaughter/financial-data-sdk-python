@@ -760,7 +760,8 @@ offline. This is the README's demonstration, steps 3 and 4.
    and names `TransportError`. The database holds 30 revisions, and
    `status` shows the stage `loading`.
 2. Clear the rules. Set the clock to `2026-09-10T12:30:40Z`.
-3. `sync --page-size 10` exits with status 0. The database holds 33
+3. `sync`, without `--page-size`, resumes with the saved page size of 10
+   and exits with status 0. The database holds 33
    revisions: the 32 the load selected, which are those of the
    `full-history` check at `2026-09-04T00:00:00Z`, and `rev_aug26_2`.
    `status` shows the stage `following`, position 37, `complete_from`
