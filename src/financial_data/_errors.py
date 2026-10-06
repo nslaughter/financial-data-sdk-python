@@ -354,11 +354,15 @@ def api_error(
     `request_id` is the `Request-Id` header, and `path` is the request's
     path with its query string, with each argument that holds the key
     already redacted. `secret` is the key, which is replaced with
-    `[redacted]` in the problem body and the request ID.
+    `[redacted]` in the problem body and the request ID. The exception is
+    chosen from the response's own `code`, so a key inside a code, such as
+    `token` in `page_token_expired`, does not change it.
     """
     if not 400 <= status <= 599:
         raise ValueError(f"status {status} is not an error status")
     problem = _problem(content_type, body)
+    # Chosen before redaction, so the key cannot change which exception it is.
+    exception_class = _exception_class(status, _text_member(problem, "code"))
     if problem is not None:
         problem = _redact_json(problem, secret)
     code = _text_member(problem, "code")
@@ -372,7 +376,7 @@ def api_error(
     text = _phrase(status) if problem is None else detail or title
     if text:
         head = f"{head}: {text}"
-    return _exception_class(status, code)(
+    return exception_class(
         _message(head, method, path, request_id, secret),
         status=status,
         method=method,

@@ -390,11 +390,41 @@ def test_key_in_a_problem_body_is_redacted_at_every_depth() -> None:
     assert_without_key(error)
 
 
-def test_key_in_a_code_is_redacted_before_the_exception_is_chosen() -> None:
+def test_key_as_an_unknown_code_is_redacted() -> None:
     error = error_for(404, problem_body(404, KEY))
     assert type(error) is APIError
     assert error.code == "[redacted]"
     assert_without_key(error)
+
+
+@pytest.mark.parametrize(
+    ("status", "code", "key", "exception", "redacted_code"),
+    [
+        (
+            410,
+            "page_token_expired",
+            "token",
+            PageTokenExpiredError,
+            "page_[redacted]_expired",
+        ),
+        (404, "not_found", "not_found", NotFoundError, "[redacted]"),
+        (400, "invalid_parameter", "code", InvalidRequestError, None),
+    ],
+    ids=["inside-a-code", "a-whole-code", "a-member-name"],
+)
+def test_key_in_a_code_does_not_change_the_exception(
+    status: int,
+    code: str,
+    key: str,
+    exception: type[APIError],
+    redacted_code: str | None,
+) -> None:
+    # The exception is chosen from the code the response sent, and only the
+    # text it holds is redacted.
+    error = error_for(status, problem_body(status, code), secret=key)
+    assert type(error) is exception
+    assert error.code == redacted_code
+    assert_without_key(error, key)
 
 
 def test_key_in_a_body_that_is_not_a_problem_is_not_kept() -> None:
