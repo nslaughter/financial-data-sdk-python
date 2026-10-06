@@ -1,0 +1,208 @@
+{
+  "contract_version": "0.3.0",
+  "case": "exports",
+  "description": "Exports are retained, repeatable, protected like queries, and expire. The file bytes follow the canonical form in the API specification, so their size and SHA-256 digest are fixed.",
+  "scenarios": [
+    {
+      "name": "a retried download returns the same bytes",
+      "steps": [
+        {
+          "id": "c",
+          "request": {"method": "POST", "path": "/v1/datasets/core-indicators/exports"},
+          "expect": {
+            "status": 201,
+            "body": {
+              "position": 37,
+              "expires_at": "2026-10-02T00:00:00Z",
+              "coverage": {"observation_count": 32, "revision_count": 37},
+              "files": [{"record_count": 37, "size_bytes": 14076, "sha256": "66d6cd910b83cf9ae974f14665f64551a5f3ce7d4f59d1297ce22d7e418024fd"}]
+            }
+          }
+        },
+        {
+          "request": {"path": "/v1/exports/${c.export_id}/files/revisions.jsonl"},
+          "expect": {
+            "status": 200,
+            "headers": {"Content-Type": "application/x-ndjson", "Content-Length": "14076"},
+            "body_sha256": "66d6cd910b83cf9ae974f14665f64551a5f3ce7d4f59d1297ce22d7e418024fd"
+          }
+        },
+        {
+          "request": {"path": "/v1/exports/${c.export_id}/files/revisions.jsonl"},
+          "expect": {"status": 200, "body_sha256": "66d6cd910b83cf9ae974f14665f64551a5f3ce7d4f59d1297ce22d7e418024fd"}
+        }
+      ],
+      "reason": "Retrying a download fetches the same retained file."
+    },
+    {
+      "name": "regenerating creates a new snapshot",
+      "clock": "2026-09-10T12:30:20Z",
+      "steps": [
+        {
+          "id": "a",
+          "request": {"method": "POST", "path": "/v1/datasets/core-indicators/exports"},
+          "expect": {"status": 201, "body": {"position": 36}}
+        },
+        {"set_clock": "2026-09-10T12:30:50Z"},
+        {
+          "id": "b",
+          "request": {"method": "POST", "path": "/v1/datasets/core-indicators/exports"},
+          "expect": {"status": 201, "body": {"position": 37}}
+        },
+        {"request": {"path": "/v1/exports/${a.export_id}"}, "expect": {"status": 200, "body": {"export_id": "${a.export_id}", "position": 36}}},
+        {"request": {"path": "/v1/exports/${b.export_id}"}, "expect": {"status": 200, "body": {"export_id": "${b.export_id}", "position": 37}}},
+        {
+          "request": {"path": "/v1/exports/${a.export_id}/files/revisions.jsonl"},
+          "expect": {"status": 200, "body_sha256": "e75e2d61e8ded1e54e210e7d854c394c9e880dcacafd2c6423ddfe5b81652469"}
+        }
+      ],
+      "reason": "A new export has a new identity and the position at its own creation; the earlier export is unchanged."
+    },
+    {
+      "name": "a new export at the same position has a new identity",
+      "steps": [
+        {
+          "id": "a",
+          "request": {"method": "POST", "path": "/v1/datasets/core-indicators/exports"},
+          "expect": {"status": 201, "body": {"position": 37, "created_at": "2026-10-01T00:00:00Z"}}
+        },
+        {"set_clock": "2026-10-01T00:00:01Z"},
+        {
+          "id": "b",
+          "request": {"method": "POST", "path": "/v1/datasets/core-indicators/exports"},
+          "expect": {"status": 201, "body": {"position": 37, "created_at": "2026-10-01T00:00:01Z"}}
+        },
+        {
+          "request": {"path": "/v1/exports/${a.export_id}"},
+          "expect": {"status": 200, "body": {"export_id": "${a.export_id}", "position": 37, "created_at": "2026-10-01T00:00:00Z"}}
+        },
+        {
+          "request": {"path": "/v1/exports/${b.export_id}"},
+          "expect": {"status": 200, "body": {"export_id": "${b.export_id}", "position": 37, "created_at": "2026-10-01T00:00:01Z"}}
+        }
+      ],
+      "reason": "Creating another export, even at the same position, creates a new identity. Both manifests remain, each with its own created_at, which one reused identifier could not return."
+    },
+    {
+      "name": "an export expires after a day",
+      "steps": [
+        {
+          "id": "c",
+          "request": {"method": "POST", "path": "/v1/datasets/core-indicators/exports"},
+          "expect": {"status": 201, "body": {"created_at": "2026-10-01T00:00:00Z", "expires_at": "2026-10-02T00:00:00Z"}}
+        },
+        {"set_clock": "2026-10-01T23:59:59Z"},
+        {"request": {"path": "/v1/exports/${c.export_id}"}, "expect": {"status": 200, "body": {"position": 37}}},
+        {
+          "request": {"path": "/v1/exports/${c.export_id}/files/revisions.jsonl"},
+          "expect": {"status": 200, "body_sha256": "66d6cd910b83cf9ae974f14665f64551a5f3ce7d4f59d1297ce22d7e418024fd"}
+        },
+        {"set_clock": "2026-10-02T00:00:00Z"},
+        {"request": {"path": "/v1/exports/${c.export_id}"}, "expect": {"status": 410, "code": "export_expired"}},
+        {"request": {"path": "/v1/exports/${c.export_id}/files/revisions.jsonl"}, "expect": {"status": 410, "code": "export_expired"}}
+      ],
+      "reason": "An export is available while the clock is before expires_at, 86,400 seconds after created_at."
+    },
+    {
+      "name": "exports are protected like queries",
+      "steps": [
+        {"id": "c", "request": {"method": "POST", "path": "/v1/datasets/core-indicators/exports"}, "expect": {"status": 201}},
+        {"request": {"path": "/v1/exports/${c.export_id}", "credential": "cred_unentitled"}, "expect": {"status": 403, "code": "not_entitled"}},
+        {
+          "request": {"path": "/v1/exports/${c.export_id}/files/revisions.jsonl", "credential": "cred_unentitled"},
+          "expect": {"status": 403, "code": "not_entitled"}
+        },
+        {
+          "request": {"path": "/v1/exports/${c.export_id}/files/revisions.jsonl", "credential": null},
+          "expect": {"status": 401, "code": "unauthenticated"}
+        },
+        {
+          "request": {"method": "POST", "path": "/v1/datasets/core-indicators/exports", "credential": "cred_unentitled"},
+          "expect": {"status": 403, "code": "not_entitled"}
+        }
+      ],
+      "reason": "An export identifier grants no access; every request needs a key entitled to the dataset."
+    },
+    {
+      "name": "a removed entitlement blocks a later download",
+      "steps": [
+        {"id": "c", "request": {"method": "POST", "path": "/v1/datasets/core-indicators/exports"}, "expect": {"status": 201}},
+        {
+          "request": {"path": "/v1/exports/${c.export_id}/files/revisions.jsonl"},
+          "expect": {"status": 200, "body_sha256": "66d6cd910b83cf9ae974f14665f64551a5f3ce7d4f59d1297ce22d7e418024fd"}
+        },
+        {"set_credential": {"credential_id": "cred_research", "datasets": []}},
+        {"request": {"path": "/v1/exports/${c.export_id}/files/revisions.jsonl"}, "expect": {"status": 403, "code": "not_entitled"}}
+      ],
+      "reason": "Access is checked at each download, not when the export was created."
+    },
+    {
+      "name": "unknown exports and files are not found",
+      "steps": [
+        {"id": "c", "request": {"method": "POST", "path": "/v1/datasets/core-indicators/exports"}, "expect": {"status": 201}},
+        {"request": {"path": "/v1/exports/exp_does_not_exist"}, "expect": {"status": 404, "code": "not_found"}},
+        {"request": {"path": "/v1/exports/${c.export_id}/files/other.jsonl"}, "expect": {"status": 404, "code": "not_found"}},
+        {"request": {"method": "POST", "path": "/v1/datasets/no-such-dataset/exports"}, "expect": {"status": 404, "code": "not_found"}}
+      ],
+      "reason": "In v1 an export has one file, revisions.jsonl."
+    },
+    {
+      "name": "a reset deletes exports",
+      "steps": [
+        {"id": "c", "request": {"method": "POST", "path": "/v1/datasets/core-indicators/exports"}, "expect": {"status": 201}},
+        {"reset": {}},
+        {"request": {"path": "/v1/exports/${c.export_id}"}, "expect": {"status": 404, "code": "not_found"}}
+      ],
+      "reason": "Exports live in memory until a reset or restart."
+    },
+    {
+      "name": "an identifier is not reused after a reset",
+      "steps": [
+        {"id": "c", "request": {"method": "POST", "path": "/v1/datasets/core-indicators/exports"}, "expect": {"status": 201, "body": {"position": 37}}},
+        {"reset": {}},
+        {"id": "d", "request": {"method": "POST", "path": "/v1/datasets/core-indicators/exports"}, "expect": {"status": 201, "body": {"position": 37}}},
+        {"request": {"path": "/v1/exports/${c.export_id}"}, "expect": {"status": 404, "code": "not_found"}},
+        {"request": {"path": "/v1/exports/${c.export_id}/files/revisions.jsonl"}, "expect": {"status": 404, "code": "not_found"}},
+        {"request": {"path": "/v1/exports/${d.export_id}"}, "expect": {"status": 200, "body": {"export_id": "${d.export_id}", "position": 37}}}
+      ],
+      "reason": "The server never reuses an export identifier, even after a reset. The export created after the reset has the same position and clock as the deleted one and still gets a new identifier, so the deleted export and its file stay not found."
+    },
+    {
+      "name": "export creation takes no options",
+      "steps": [
+        {
+          "request": {"method": "POST", "path": "/v1/datasets/core-indicators/exports", "body": {"position": 10}},
+          "expect": {"status": 400, "code": "unknown_parameter", "body": {"parameter": "position"}}
+        },
+        {
+          "request": {"method": "POST", "path": "/v1/datasets/core-indicators/exports", "body": {}},
+          "expect": {"status": 201, "body": {"position": 37}}
+        }
+      ],
+      "reason": "An export is always taken at the current head position."
+    },
+    {
+      "name": "an export of an empty snapshot",
+      "clock": "2024-01-01T00:00:00Z",
+      "steps": [
+        {
+          "id": "c",
+          "request": {"method": "POST", "path": "/v1/datasets/core-indicators/exports"},
+          "expect": {
+            "status": 201,
+            "body": {
+              "position": 0,
+              "coverage": {"series_ids": [], "observation_count": 0, "revision_count": 0, "period_start": null, "period_end": null},
+              "files": [{"record_count": 0, "size_bytes": 0, "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}]
+            }
+          }
+        },
+        {
+          "request": {"path": "/v1/exports/${c.export_id}/files/revisions.jsonl"},
+          "expect": {"status": 200, "body_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"}
+        }
+      ],
+      "reason": "Before any revision is available, an export is valid and its file is empty."
+    }
+  ]
+}

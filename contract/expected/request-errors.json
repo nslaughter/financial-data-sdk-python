@@ -1,0 +1,341 @@
+{
+  "contract_version": "0.3.0",
+  "case": "request-errors",
+  "description": "Requests the API refuses, the error each returns, and the order in which faults are reported. All run at the default clock.",
+  "scenarios": [
+    {
+      "name": "error bodies",
+      "steps": [
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "available_asof": "2026-09-04T00:00:00Z"}},
+          "expect": {
+            "status": 400,
+            "code": "unknown_parameter",
+            "headers": {"Content-Type": "application/problem+json"},
+            "body": {"status": 400, "code": "unknown_parameter", "title": "Unknown parameter", "parameter": "available_asof"}
+          }
+        }
+      ],
+      "reason": "Every error has status, code, title, detail, and parameter. detail is not compared because its wording may change. A misspelled cutoff is refused instead of returning the latest data."
+    },
+    {
+      "name": "unknown parameters are refused",
+      "steps": [
+        {
+          "request": {"path": "/v1/series", "query": {"dataset_id": "core-indicators"}},
+          "expect": {"status": 400, "code": "unknown_parameter", "body": {"parameter": "dataset_id"}}
+        },
+        {
+          "request": {"path": "/v1/datasets/core-indicators/changes", "query": {"after": "0", "page_size": "10"}},
+          "expect": {"status": 400, "code": "unknown_parameter", "body": {"parameter": "page_size"}}
+        },
+        {
+          "request": {"path": "/v1/meta", "query": {"verbose": "true"}, "credential": null},
+          "expect": {"status": 400, "code": "unknown_parameter", "body": {"parameter": "verbose"}}
+        }
+      ],
+      "reason": "An endpoint accepts only the parameters it defines. The change stream takes limit, not page_size."
+    },
+    {
+      "name": "a stage 1 server refuses stage 2 parameters and paths",
+      "stages": [1],
+      "steps": [
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "published_as_of": "2026-09-04T00:00:00Z"}},
+          "expect": {"status": 400, "code": "unknown_parameter", "body": {"parameter": "published_as_of"}}
+        },
+        {
+          "request": {"path": "/v1/revisions", "query": {"series_id": "activity-index"}},
+          "expect": {"status": 404, "code": "not_found"}
+        }
+      ],
+      "reason": "published_as_of and GET /v1/revisions are stage 2. A stage 1 server refuses the cutoff instead of silently returning the latest data, and has no such path. A stage 2 server answers both, so this scenario runs only at stage 1."
+    },
+    {
+      "name": "required parameters",
+      "steps": [
+        {
+          "request": {"path": "/v1/observations", "query": {}},
+          "expect": {"status": 400, "code": "missing_parameter", "body": {"parameter": "series_id"}}
+        },
+        {
+          "request": {"path": "/v1/datasets/core-indicators/changes", "query": {}},
+          "expect": {"status": 400, "code": "missing_parameter", "body": {"parameter": "after"}}
+        }
+      ],
+      "reason": "series_id and after have no defaults."
+    },
+    {
+      "name": "repeated and empty parameters",
+      "steps": [
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": ["activity-index", "activity-index"]}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "series_id"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "available_as_of": ""}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "available_as_of"}}
+        }
+      ],
+      "reason": "A parameter may appear once, with a value."
+    },
+    {
+      "name": "timestamps must have the exact format",
+      "steps": [
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "available_as_of": "2026-09-04T00:00:00.000Z"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "available_as_of"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "available_as_of": "2026-09-04T00:00:00+00:00"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "available_as_of"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "available_as_of": "2026-09-04"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "available_as_of"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "available_as_of": "2026-09-04t00:00:00z"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "available_as_of"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "available_as_of": "2026-09-04 00:00:00Z"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "available_as_of"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "available_as_of": "2026-09-04T24:00:00Z"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "available_as_of"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "available_as_of": "2026-09-04T00:00:60Z"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "available_as_of"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "available_as_of": "2026-02-30T00:00:00Z"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "available_as_of"}}
+        }
+      ],
+      "reason": "Only YYYY-MM-DDTHH:MM:SSZ with a valid UTC instant is accepted: no fractional seconds, offsets, bare dates, lowercase letters, leap seconds, or impossible dates."
+    },
+    {
+      "name": "dates must be valid",
+      "steps": [
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "period_start": "2026-02-30"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "period_start"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "period_start": "2026-8-01"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "period_start"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "period_end": "2026-09-01T00:00:00Z"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "period_end"}}
+        }
+      ],
+      "reason": "Dates are YYYY-MM-DD calendar dates."
+    },
+    {
+      "name": "a period range must not be empty or reversed",
+      "steps": [
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "period_start": "2026-09-01", "period_end": "2026-09-01"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "period_end"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "period_start": "2026-09-01", "period_end": "2026-08-01"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "period_end"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "period_start": "2026-08-01"}},
+          "expect": {"status": 200, "body": {"data": [{"observation_id": "obs_aug26"}]}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "period_end": "2024-02-01"}},
+          "expect": {"status": 200, "body": {"data": [{"observation_id": "obs_jan24"}]}}
+        }
+      ],
+      "reason": "Either bound may be omitted. When both are given, period_start must be before period_end. An empty or reversed range names period_end."
+    },
+    {
+      "name": "a period filter matches only periods within the range",
+      "steps": [
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "period_start": "2026-07-15", "period_end": "2026-09-01"}},
+          "expect": {"status": 200, "body": {"data": [{"observation_id": "obs_aug26", "revision_id": "rev_aug26_2"}]}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "period_start": "2026-07-01", "period_end": "2026-08-15"}},
+          "expect": {"status": 200, "body": {"data": [{"observation_id": "obs_jul26", "revision_id": "rev_jul26_1"}]}}
+        }
+      ],
+      "reason": "An observation is included only when its whole period lies within the range. July 2026 starts before 2026-07-15 and August 2026 ends after 2026-08-15, so each is excluded by the bound it crosses; overlap matching would return both."
+    },
+    {
+      "name": "a cutoff may equal the clock but not pass it",
+      "steps": [
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "available_as_of": "2026-10-01T00:00:01Z"}},
+          "expect": {"status": 400, "code": "cutoff_in_future", "body": {"parameter": "available_as_of"}}
+        },
+        {
+          "request": {
+            "path": "/v1/observations",
+            "query": {
+              "series_id": "activity-index",
+              "period_start": "2026-08-01",
+              "period_end": "2026-09-01",
+              "available_as_of": "2026-10-01T00:00:00Z"
+            }
+          },
+          "expect": {"status": 200, "body": {"data": [{"revision_id": "rev_aug26_2"}]}}
+        }
+      ],
+      "reason": "The default clock is 2026-10-01T00:00:00Z."
+    },
+    {
+      "name": "page sizes and limits",
+      "steps": [
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "0"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "page_size"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "1001"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "page_size"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "ten"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "page_size"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "010"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "page_size"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "-1"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "page_size"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "+5"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "page_size"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "1000"}},
+          "expect": {"status": 200, "body": {"next_page_token": null}}
+        },
+        {
+          "request": {"path": "/v1/datasets/core-indicators/changes", "query": {"after": "0", "limit": "0"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "limit"}}
+        },
+        {
+          "request": {"path": "/v1/datasets/core-indicators/changes", "query": {"after": "0", "limit": "1001"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "limit"}}
+        },
+        {
+          "request": {"path": "/v1/datasets/core-indicators/changes", "query": {"after": "0", "limit": "1000"}},
+          "expect": {"status": 200, "body": {"next_position": 37, "head_position": 37}}
+        },
+        {
+          "request": {"path": "/v1/datasets/core-indicators/changes", "query": {"after": "-1"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "after"}}
+        },
+        {
+          "request": {"path": "/v1/datasets/core-indicators/changes", "query": {"after": "1.5"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "after"}}
+        },
+        {
+          "request": {"path": "/v1/datasets/core-indicators/changes", "query": {"after": "01"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "after"}}
+        }
+      ],
+      "reason": "page_size and limit run from 1 to 1000; after is a non-negative integer. Integers have no sign and no leading zeros."
+    },
+    {
+      "name": "request bodies",
+      "steps": [
+        {
+          "request": {"method": "PUT", "path": "/test/clock", "credential": "cred_test_control", "body": ["2026-10-01T00:00:00Z"]},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": null}}
+        },
+        {
+          "request": {"method": "PUT", "path": "/test/clock", "credential": "cred_test_control"},
+          "expect": {"status": 400, "code": "missing_parameter", "body": {"parameter": "now"}}
+        }
+      ],
+      "reason": "A body that is not a JSON object is malformed, and its error names no parameter. An absent body is treated as {}, so the required now is missing."
+    },
+    {
+      "name": "a position ahead of the stream",
+      "steps": [
+        {
+          "request": {"path": "/v1/datasets/core-indicators/changes", "query": {"after": "38"}},
+          "expect": {"status": 400, "code": "position_ahead", "body": {"parameter": "after"}}
+        },
+        {
+          "request": {"path": "/v1/datasets/core-indicators/changes", "query": {"after": "37"}},
+          "expect": {"status": 200, "body": {"data": [], "next_position": 37, "head_position": 37}}
+        }
+      ],
+      "reason": "The head position at the default clock is 37. A client caught up at the head reads nothing and keeps its position."
+    },
+    {
+      "name": "unsupported versions and unknown paths",
+      "steps": [
+        {"request": {"path": "/v2/series"}, "expect": {"status": 404, "code": "unsupported_api_version"}},
+        {"request": {"path": "/v0/meta", "credential": null}, "expect": {"status": 404, "code": "unsupported_api_version"}},
+        {"request": {"path": "/v1/nothing"}, "expect": {"status": 404, "code": "not_found"}},
+        {"request": {"path": "/v1/series/"}, "expect": {"status": 404, "code": "not_found"}},
+        {"request": {"path": "/test/nothing", "credential": "cred_test_control"}, "expect": {"status": 404, "code": "not_found"}}
+      ],
+      "reason": "A request for another API version fails with an explanation instead of falling back to v1. Paths match exactly."
+    },
+    {
+      "name": "methods",
+      "steps": [
+        {"request": {"method": "POST", "path": "/v1/series"}, "expect": {"status": 405, "code": "method_not_allowed", "headers": {"Allow": "GET"}}},
+        {
+          "request": {"method": "DELETE", "path": "/v1/observations", "query": {"series_id": "activity-index"}},
+          "expect": {"status": 405, "code": "method_not_allowed", "headers": {"Allow": "GET"}}
+        },
+        {
+          "request": {"method": "POST", "path": "/test/clock", "credential": "cred_test_control"},
+          "expect": {"status": 405, "code": "method_not_allowed", "headers": {"Allow": "GET, PUT"}}
+        }
+      ],
+      "reason": "The Allow header lists the methods the path supports, separated by a comma and a space, in the order GET, PUT, POST."
+    },
+    {
+      "name": "errors are reported in a fixed order",
+      "steps": [
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "available_asof": "x"}, "credential": null},
+          "expect": {"status": 401, "code": "unauthenticated"}
+        },
+        {"request": {"path": "/v2/series", "credential": null}, "expect": {"status": 404, "code": "unsupported_api_version"}},
+        {"request": {"method": "POST", "path": "/v1/series", "credential": null}, "expect": {"status": 405, "code": "method_not_allowed"}},
+        {
+          "request": {
+            "path": "/v1/observations",
+            "query": {"series_id": "activity-index", "available_as_of": "yesterday"},
+            "credential": "cred_unentitled"
+          },
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "available_as_of"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "no-such-series", "available_as_of": "yesterday"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "available_as_of"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "no-such-series"}, "credential": "cred_unentitled"},
+          "expect": {"status": 404, "code": "not_found"}
+        },
+        {
+          "request": {"path": "/v1/datasets/core-indicators/changes", "query": {"after": "38"}, "credential": "cred_unentitled"},
+          "expect": {"status": 403, "code": "not_entitled"}
+        }
+      ],
+      "reason": "Routing, then authentication, then request validation, then lookup, then entitlement, then state."
+    }
+  ]
+}

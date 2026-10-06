@@ -1,0 +1,263 @@
+{
+  "contract_version": "0.3.0",
+  "case": "revision-history",
+  "description": "GET /v1/revisions returns every visible revision, including superseded, withdrawn, and erroneous ones, ordered by period_start and revision_number.",
+  "scenarios": [
+    {
+      "name": "every revision of an observation released out of order",
+      "steps": [
+        {
+          "request": {"path": "/v1/revisions", "query": {"series_id": "activity-index", "period_start": "2025-11-01", "period_end": "2025-12-01"}},
+          "expect": {
+            "status": 200,
+            "body": {
+              "data": [
+                {
+                  "sequence": 26,
+                  "revision_id": "rev_nov25_1",
+                  "revision_number": 1,
+                  "change_type": "initial_release",
+                  "value": "100.0",
+                  "available_at": "2025-12-04T12:45:00Z"
+                },
+                {
+                  "sequence": 25,
+                  "revision_id": "rev_nov25_2",
+                  "revision_number": 2,
+                  "change_type": "source_revision",
+                  "value": "100.2",
+                  "available_at": "2025-12-04T12:31:10Z"
+                }
+              ],
+              "position": 37,
+              "next_page_token": null
+            }
+          }
+        }
+      ],
+      "reason": "Revisions are ordered by revision_number, not by sequence: rev_nov25_1 arrived after rev_nov25_2 and still comes first."
+    },
+    {
+      "name": "at a cutoff, only revisions available by then",
+      "steps": [
+        {
+          "request": {
+            "path": "/v1/revisions",
+            "query": {
+              "series_id": "activity-index",
+              "period_start": "2025-11-01",
+              "period_end": "2025-12-01",
+              "available_as_of": "2025-12-04T12:31:10Z"
+            }
+          },
+          "expect": {"status": 200, "body": {"data": [{"revision_id": "rev_nov25_2"}]}}
+        }
+      ],
+      "reason": "rev_nov25_1 was held until 12:45."
+    },
+    {
+      "name": "a withdrawal stays in the history",
+      "steps": [
+        {
+          "request": {"path": "/v1/revisions", "query": {"series_id": "activity-index", "period_start": "2025-05-01", "period_end": "2025-06-01"}},
+          "expect": {
+            "status": 200,
+            "body": {
+              "data": [
+                {"revision_id": "rev_may25_1", "change_type": "initial_release", "value": "100.6", "missing_reason": null},
+                {"revision_id": "rev_may25_2", "change_type": "withdrawal", "value": null, "missing_reason": null},
+                {"revision_id": "rev_may25_3", "change_type": "source_revision", "value": "100.1", "missing_reason": null}
+              ]
+            }
+          }
+        }
+      ],
+      "reason": "The withdrawn value and the withdrawal remain after the re-release."
+    },
+    {
+      "name": "an erroneous value stays in the history",
+      "steps": [
+        {
+          "request": {"path": "/v1/revisions", "query": {"series_id": "activity-index", "period_start": "2026-02-01", "period_end": "2026-03-01"}},
+          "expect": {
+            "status": 200,
+            "body": {
+              "data": [
+                {
+                  "revision_id": "rev_feb26_1",
+                  "change_type": "initial_release",
+                  "value": "1.013",
+                  "published_at": "2026-03-03T12:30:00Z",
+                  "available_at": "2026-03-03T12:31:10Z"
+                },
+                {
+                  "revision_id": "rev_feb26_2",
+                  "change_type": "provider_correction",
+                  "value": "101.3",
+                  "published_at": "2026-03-03T12:30:00Z",
+                  "available_at": "2026-03-05T15:20:00Z"
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "reason": "The value the API served in error remains, so the history explains what earlier research received."
+    },
+    {
+      "name": "a period filter matches only periods within the range",
+      "steps": [
+        {
+          "request": {"path": "/v1/revisions", "query": {"series_id": "activity-index", "period_start": "2026-07-15", "period_end": "2026-09-01"}},
+          "expect": {"status": 200, "body": {"data": [{"revision_id": "rev_aug26_1"}, {"revision_id": "rev_aug26_2"}]}}
+        },
+        {
+          "request": {"path": "/v1/revisions", "query": {"series_id": "activity-index", "period_start": "2026-07-01", "period_end": "2026-08-15"}},
+          "expect": {"status": 200, "body": {"data": [{"revision_id": "rev_jul26_1"}]}}
+        }
+      ],
+      "reason": "The revision history filters periods as observations do: an observation's revisions are included only when its whole period lies within the range. Overlap matching would add rev_jul26_1 to the first result and both August revisions to the second."
+    },
+    {
+      "name": "the whole history in pages of ten",
+      "steps": [
+        {
+          "id": "p1",
+          "request": {"path": "/v1/revisions", "query": {"series_id": "activity-index", "page_size": "10"}},
+          "expect": {
+            "status": 200,
+            "body": {
+              "data": [
+                {"revision_id": "rev_jan24_1"},
+                {"revision_id": "rev_feb24_1"},
+                {"revision_id": "rev_mar24_1"},
+                {"revision_id": "rev_apr24_1"},
+                {"revision_id": "rev_may24_1"},
+                {"revision_id": "rev_jun24_1"},
+                {"revision_id": "rev_jul24_1"},
+                {"revision_id": "rev_aug24_1"},
+                {"revision_id": "rev_sep24_1"},
+                {"revision_id": "rev_oct24_1"}
+              ]
+            }
+          }
+        },
+        {
+          "id": "p2",
+          "request": {"path": "/v1/revisions", "query": {"series_id": "activity-index", "page_size": "10", "page_token": "${p1.next_page_token}"}},
+          "expect": {
+            "status": 200,
+            "body": {
+              "data": [
+                {"revision_id": "rev_nov24_1"},
+                {"revision_id": "rev_dec24_1"},
+                {"revision_id": "rev_jan25_1"},
+                {"revision_id": "rev_feb25_1"},
+                {"revision_id": "rev_mar25_1"},
+                {"revision_id": "rev_apr25_1"},
+                {"revision_id": "rev_may25_1"},
+                {"revision_id": "rev_may25_2"},
+                {"revision_id": "rev_may25_3"},
+                {"revision_id": "rev_jun25_1"}
+              ]
+            }
+          }
+        },
+        {
+          "id": "p3",
+          "request": {"path": "/v1/revisions", "query": {"series_id": "activity-index", "page_size": "10", "page_token": "${p2.next_page_token}"}},
+          "expect": {
+            "status": 200,
+            "body": {
+              "data": [
+                {"revision_id": "rev_jul25_1"},
+                {"revision_id": "rev_aug25_1"},
+                {"revision_id": "rev_sep25_1"},
+                {"revision_id": "rev_oct25_1"},
+                {"revision_id": "rev_nov25_1"},
+                {"revision_id": "rev_nov25_2"},
+                {"revision_id": "rev_dec25_1"},
+                {"revision_id": "rev_jan26_1"},
+                {"revision_id": "rev_feb26_1"},
+                {"revision_id": "rev_feb26_2"}
+              ]
+            }
+          }
+        },
+        {
+          "request": {"path": "/v1/revisions", "query": {"series_id": "activity-index", "page_size": "10", "page_token": "${p3.next_page_token}"}},
+          "expect": {
+            "status": 200,
+            "body": {
+              "data": [
+                {"revision_id": "rev_mar26_1"},
+                {"revision_id": "rev_apr26_1"},
+                {"revision_id": "rev_may26_1"},
+                {"revision_id": "rev_jun26_1"},
+                {"revision_id": "rev_jul26_1"},
+                {"revision_id": "rev_aug26_1"},
+                {"revision_id": "rev_aug26_2"}
+              ],
+              "next_page_token": null
+            }
+          }
+        }
+      ],
+      "reason": "37 revisions, ordered by period_start and then revision_number."
+    },
+    {
+      "name": "revisions after the clock are invisible",
+      "clock": "2026-09-10T12:30:20Z",
+      "steps": [
+        {
+          "request": {"path": "/v1/revisions", "query": {"series_id": "activity-index", "period_start": "2026-08-01", "period_end": "2026-09-01"}},
+          "expect": {"status": 200, "body": {"data": [{"revision_id": "rev_aug26_1"}], "position": 36}}
+        }
+      ],
+      "reason": "rev_aug26_2 is not available until 12:30:40."
+    },
+    {
+      "name": "a token belongs to its endpoint",
+      "steps": [
+        {"id": "p1", "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10"}}, "expect": {"status": 200}},
+        {
+          "request": {"path": "/v1/revisions", "query": {"series_id": "activity-index", "page_size": "10", "page_token": "${p1.next_page_token}"}},
+          "expect": {"status": 400, "code": "page_token_mismatch"}
+        }
+      ],
+      "reason": "A token from the observations query cannot continue the revision history."
+    },
+    {
+      "name": "the history has one cutoff",
+      "steps": [
+        {
+          "request": {
+            "path": "/v1/revisions",
+            "query": {
+              "series_id": "activity-index",
+              "period_start": "2025-11-01",
+              "period_end": "2025-12-01",
+              "published_as_of": "2025-12-04T00:00:00Z"
+            }
+          },
+          "expect": {"status": 400, "code": "unknown_parameter", "body": {"parameter": "published_as_of"}}
+        }
+      ],
+      "reason": "The revision history takes available_as_of only."
+    },
+    {
+      "name": "the history requires entitlement",
+      "steps": [
+        {
+          "request": {
+            "path": "/v1/revisions",
+            "query": {"series_id": "activity-index", "period_start": "2025-11-01", "period_end": "2025-12-01"},
+            "credential": "cred_unentitled"
+          },
+          "expect": {"status": 403, "code": "not_entitled"}
+        }
+      ],
+      "reason": "The history is data like any query result."
+    }
+  ]
+}

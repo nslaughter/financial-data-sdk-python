@@ -1,0 +1,230 @@
+{
+  "contract_version": "0.3.0",
+  "case": "published-as-of",
+  "description": "What the source had published by each cutoff, with the provider's processing errors corrected. Each check also gives contrast_available_as_of: the result of the available_as_of query at the same instant, which describes what a customer could retrieve.",
+  "checks": [
+    {
+      "name": "provider correction applied",
+      "query": {"series_id": "activity-index", "period_start": "2026-02-01", "period_end": "2026-03-01", "published_as_of": "2026-03-04T00:00:00Z"},
+      "expected": [
+        {"observation_id": "obs_feb26", "revision_id": "rev_feb26_2", "value": "101.3"}
+      ],
+      "contrast_available_as_of": [
+        {"observation_id": "obs_feb26", "revision_id": "rev_feb26_1", "value": "1.013"}
+      ],
+      "reason": "rev_feb26_2 keeps the source's published_at of March 3, so the correction applies. The API was serving 1.013 at that time."
+    },
+    {
+      "name": "corrected value at the instant of source publication",
+      "query": {"series_id": "activity-index", "period_start": "2026-02-01", "period_end": "2026-03-01", "published_as_of": "2026-03-03T12:30:00Z"},
+      "expected": [
+        {"observation_id": "obs_feb26", "revision_id": "rev_feb26_2", "value": "101.3"}
+      ],
+      "contrast_available_as_of": [],
+      "reason": "Both February revisions have published_at 12:30:00, and the boundary is inclusive. Nothing was available until 12:31:10."
+    },
+    {
+      "name": "release held by the provider",
+      "query": {"series_id": "activity-index", "period_start": "2025-11-01", "period_end": "2025-12-01", "published_as_of": "2025-12-03T13:00:00Z"},
+      "expected": [
+        {"observation_id": "obs_nov25", "revision_id": "rev_nov25_1", "value": "100.0"}
+      ],
+      "contrast_available_as_of": [],
+      "reason": "The source published 100.0 on time. The provider held it until December 4 at 12:45:00."
+    },
+    {
+      "name": "source revision at the instant of publication",
+      "query": {"series_id": "activity-index", "period_start": "2025-11-01", "period_end": "2025-12-01", "published_as_of": "2025-12-04T12:30:00Z"},
+      "expected": [
+        {"observation_id": "obs_nov25", "revision_id": "rev_nov25_2", "value": "100.2"}
+      ],
+      "contrast_available_as_of": [],
+      "reason": "rev_nov25_2 was published at 12:30:00 and supersedes rev_nov25_1. Neither revision was available yet."
+    },
+    {
+      "name": "the two cutoffs agree",
+      "query": {"series_id": "activity-index", "period_start": "2026-08-01", "period_end": "2026-09-01", "published_as_of": "2026-09-04T00:00:00Z"},
+      "expected": [
+        {"observation_id": "obs_aug26", "revision_id": "rev_aug26_1", "value": "102.4"}
+      ],
+      "contrast_available_as_of": [
+        {"observation_id": "obs_aug26", "revision_id": "rev_aug26_1", "value": "102.4"}
+      ],
+      "reason": "August had one version, published on time and available 70 seconds later."
+    },
+    {
+      "name": "revision published, not yet available",
+      "query": {"series_id": "activity-index", "period_start": "2026-08-01", "period_end": "2026-09-01", "published_as_of": "2026-09-10T12:30:20Z"},
+      "expected": [
+        {"observation_id": "obs_aug26", "revision_id": "rev_aug26_2", "value": "102.1"}
+      ],
+      "contrast_available_as_of": [
+        {"observation_id": "obs_aug26", "revision_id": "rev_aug26_1", "value": "102.4"}
+      ],
+      "reason": "The source published 102.1 at 12:30:00. Customers could retrieve it from 12:30:40."
+    },
+    {
+      "name": "source late, nothing published",
+      "query": {"series_id": "activity-index", "period_start": "2026-07-01", "period_end": "2026-08-01", "published_as_of": "2026-08-03T13:00:00Z"},
+      "expected": [],
+      "contrast_available_as_of": [],
+      "reason": "Both queries are empty because the source had not published. The provider is not the cause."
+    },
+    {
+      "name": "late source release at the instant of publication",
+      "query": {"series_id": "activity-index", "period_start": "2026-07-01", "period_end": "2026-08-01", "published_as_of": "2026-08-03T14:05:00Z"},
+      "expected": [
+        {"observation_id": "obs_jul26", "revision_id": "rev_jul26_1", "value": "102.2"}
+      ],
+      "contrast_available_as_of": [],
+      "reason": "Published at 14:05:00; available at 14:06:10."
+    },
+    {
+      "name": "one second before the withdrawal is announced",
+      "query": {"series_id": "activity-index", "period_start": "2025-05-01", "period_end": "2025-06-01", "published_as_of": "2025-06-20T15:59:59Z"},
+      "expected": [
+        {"observation_id": "obs_may25", "revision_id": "rev_may25_1", "value": "100.6"}
+      ],
+      "contrast_available_as_of": [
+        {"observation_id": "obs_may25", "revision_id": "rev_may25_1", "value": "100.6"}
+      ],
+      "reason": "Only the initial release had been published."
+    },
+    {
+      "name": "withdrawal announced, not yet available",
+      "query": {"series_id": "activity-index", "period_start": "2025-05-01", "period_end": "2025-06-01", "published_as_of": "2025-06-20T16:00:00Z"},
+      "expected": [
+        {"observation_id": "obs_may25", "revision_id": "rev_may25_2", "value": null, "missing_reason": null, "change_type": "withdrawal"}
+      ],
+      "contrast_available_as_of": [
+        {"observation_id": "obs_may25", "revision_id": "rev_may25_1", "value": "100.6"}
+      ],
+      "reason": "The source announced the withdrawal at 16:00:00, so the withdrawal is returned. The API still served 100.6 until 16:01:10."
+    },
+    {
+      "name": "released without a value at the instant of publication",
+      "query": {"series_id": "activity-index", "period_start": "2024-10-01", "period_end": "2024-11-01", "published_as_of": "2024-11-03T12:30:00Z"},
+      "expected": [
+        {"observation_id": "obs_oct24", "revision_id": "rev_oct24_1", "value": null, "missing_reason": "not_collected"}
+      ],
+      "contrast_available_as_of": [],
+      "reason": "The source published the period without a value at 12:30:00; it was available at 12:31:10."
+    }
+  ],
+  "scenarios": [
+    {
+      "name": "both cutoffs are refused",
+      "steps": [
+        {
+          "request": {
+            "path": "/v1/observations",
+            "query": {
+              "series_id": "activity-index",
+              "period_start": "2026-02-01",
+              "period_end": "2026-03-01",
+              "available_as_of": "2026-03-04T00:00:00Z",
+              "published_as_of": "2026-03-04T00:00:00Z"
+            }
+          },
+          "expect": {"status": 400, "code": "conflicting_cutoffs", "body": {"parameter": null}}
+        }
+      ],
+      "reason": "A query takes at most one cutoff. The error names no single parameter."
+    },
+    {
+      "name": "a published_as_of after the clock is refused",
+      "steps": [
+        {
+          "request": {
+            "path": "/v1/observations",
+            "query": {
+              "series_id": "activity-index",
+              "period_start": "2026-02-01",
+              "period_end": "2026-03-01",
+              "published_as_of": "2026-10-01T00:00:01Z"
+            }
+          },
+          "expect": {"status": 400, "code": "cutoff_in_future", "body": {"parameter": "published_as_of"}}
+        }
+      ],
+      "reason": "The default clock is 2026-10-01T00:00:00Z."
+    },
+    {
+      "name": "a correction not yet made is not applied",
+      "clock": "2026-03-04T00:00:00Z",
+      "steps": [
+        {
+          "request": {
+            "path": "/v1/observations",
+            "query": {
+              "series_id": "activity-index",
+              "period_start": "2026-02-01",
+              "period_end": "2026-03-01",
+              "published_as_of": "2026-03-04T00:00:00Z"
+            }
+          },
+          "expect": {"status": 200, "body": {"data": [{"revision_id": "rev_feb26_1", "value": "1.013"}]}}
+        },
+        {"set_clock": "2026-03-05T15:20:00Z"},
+        {
+          "request": {
+            "path": "/v1/observations",
+            "query": {
+              "series_id": "activity-index",
+              "period_start": "2026-02-01",
+              "period_end": "2026-03-01",
+              "published_as_of": "2026-03-04T00:00:00Z"
+            }
+          },
+          "expect": {"status": 200, "body": {"data": [{"revision_id": "rev_feb26_2", "value": "101.3"}]}}
+        }
+      ],
+      "reason": "The query reflects the revisions available when it runs. With the clock at March 4, the correction does not exist yet; once it does, the same query applies it."
+    },
+    {
+      "name": "a release held by the provider is absent until available",
+      "clock": "2025-12-03T13:00:00Z",
+      "steps": [
+        {
+          "request": {
+            "path": "/v1/observations",
+            "query": {
+              "series_id": "activity-index",
+              "period_start": "2025-11-01",
+              "period_end": "2025-12-01",
+              "published_as_of": "2025-12-03T13:00:00Z"
+            }
+          },
+          "expect": {"status": 200, "body": {"data": []}}
+        },
+        {"set_clock": "2025-12-04T12:31:10Z"},
+        {
+          "request": {
+            "path": "/v1/observations",
+            "query": {
+              "series_id": "activity-index",
+              "period_start": "2025-11-01",
+              "period_end": "2025-12-01",
+              "published_as_of": "2025-12-03T13:00:00Z"
+            }
+          },
+          "expect": {"status": 200, "body": {"data": []}}
+        },
+        {"set_clock": "2025-12-04T12:45:00Z"},
+        {
+          "request": {
+            "path": "/v1/observations",
+            "query": {
+              "series_id": "activity-index",
+              "period_start": "2025-11-01",
+              "period_end": "2025-12-01",
+              "published_as_of": "2025-12-03T13:00:00Z"
+            }
+          },
+          "expect": {"status": 200, "body": {"data": [{"revision_id": "rev_nov25_1", "value": "100.0"}]}}
+        }
+      ],
+      "reason": "The source published 100.0 on December 3, but the provider held it until December 4 at 12:45. The revision that became available first was published after the cutoff. The query check at the default clock returns rev_nov25_1 for the same cutoff."
+    }
+  ]
+}

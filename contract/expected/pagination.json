@@ -1,0 +1,337 @@
+{
+  "contract_version": "0.3.0",
+  "case": "pagination",
+  "description": "Paged queries are evaluated at one snapshot position. Tokens are opaque, bound to their endpoint, parameters, and credential, and expire with their snapshot.",
+  "scenarios": [
+    {
+      "name": "pages keep their snapshot while a revision arrives",
+      "clock": "2026-09-10T12:30:20Z",
+      "steps": [
+        {
+          "id": "p1",
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10"}},
+          "expect": {
+            "status": 200,
+            "body": {
+              "data": [
+                {"observation_id": "obs_jan24"},
+                {"observation_id": "obs_feb24"},
+                {"observation_id": "obs_mar24"},
+                {"observation_id": "obs_apr24"},
+                {"observation_id": "obs_may24"},
+                {"observation_id": "obs_jun24"},
+                {"observation_id": "obs_jul24"},
+                {"observation_id": "obs_aug24"},
+                {"observation_id": "obs_sep24"},
+                {"observation_id": "obs_oct24"}
+              ],
+              "position": 36,
+              "snapshot_expires_at": "2026-09-10T13:30:20Z"
+            }
+          }
+        },
+        {
+          "id": "p2",
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10", "page_token": "${p1.next_page_token}"}},
+          "expect": {
+            "status": 200,
+            "body": {
+              "data": [
+                {"observation_id": "obs_nov24"},
+                {"observation_id": "obs_dec24"},
+                {"observation_id": "obs_jan25"},
+                {"observation_id": "obs_feb25"},
+                {"observation_id": "obs_mar25"},
+                {"observation_id": "obs_apr25"},
+                {"observation_id": "obs_may25"},
+                {"observation_id": "obs_jun25"},
+                {"observation_id": "obs_jul25"},
+                {"observation_id": "obs_aug25"}
+              ],
+              "position": 36
+            }
+          }
+        },
+        {
+          "id": "p3",
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10", "page_token": "${p2.next_page_token}"}},
+          "expect": {
+            "status": 200,
+            "body": {
+              "data": [
+                {"observation_id": "obs_sep25"},
+                {"observation_id": "obs_oct25"},
+                {"observation_id": "obs_nov25"},
+                {"observation_id": "obs_dec25"},
+                {"observation_id": "obs_jan26"},
+                {"observation_id": "obs_feb26"},
+                {"observation_id": "obs_mar26"},
+                {"observation_id": "obs_apr26"},
+                {"observation_id": "obs_may26"},
+                {"observation_id": "obs_jun26"}
+              ],
+              "position": 36
+            }
+          }
+        },
+        {"set_clock": "2026-09-10T12:30:40Z"},
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10", "page_token": "${p3.next_page_token}"}},
+          "expect": {
+            "status": 200,
+            "body": {
+              "data": [
+                {"observation_id": "obs_jul26", "revision_id": "rev_jul26_1"},
+                {"observation_id": "obs_aug26", "revision_id": "rev_aug26_1", "value": "102.4"}
+              ],
+              "position": 36,
+              "snapshot_expires_at": "2026-09-10T13:30:20Z",
+              "next_page_token": null
+            }
+          }
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "period_start": "2026-08-01", "period_end": "2026-09-01"}},
+          "expect": {"status": 200, "body": {"data": [{"revision_id": "rev_aug26_2", "value": "102.1"}], "position": 37}}
+        }
+      ],
+      "reason": "The query began at position 36, so its fourth page still holds rev_aug26_1 after rev_aug26_2 becomes available. A new query sees position 37."
+    },
+    {
+      "name": "a cutoff cannot be dropped when resuming",
+      "steps": [
+        {
+          "id": "p1",
+          "request": {
+            "path": "/v1/observations",
+            "query": {"series_id": "activity-index", "page_size": "10", "available_as_of": "2026-09-04T00:00:00Z"}
+          },
+          "expect": {"status": 200, "body": {"position": 37}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10", "page_token": "${p1.next_page_token}"}},
+          "expect": {"status": 400, "code": "page_token_mismatch"}
+        }
+      ],
+      "reason": "Every parameter except page_token must equal the first request. Without this rule, a resumed page could silently switch from the September 4 research date to the latest data."
+    },
+    {
+      "name": "a filter cannot change when resuming",
+      "steps": [
+        {"id": "p1", "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10"}}, "expect": {"status": 200}},
+        {
+          "request": {
+            "path": "/v1/observations",
+            "query": {"series_id": "activity-index", "page_size": "10", "period_start": "2025-01-01", "page_token": "${p1.next_page_token}"}
+          },
+          "expect": {"status": 400, "code": "page_token_mismatch"}
+        }
+      ],
+      "reason": "A token is bound to the filters of the query that issued it."
+    },
+    {
+      "name": "the page size cannot change when resuming",
+      "steps": [
+        {"id": "p1", "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10"}}, "expect": {"status": 200}},
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "20", "page_token": "${p1.next_page_token}"}},
+          "expect": {"status": 400, "code": "page_token_mismatch"}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_token": "${p1.next_page_token}"}},
+          "expect": {"status": 400, "code": "page_token_mismatch"}
+        }
+      ],
+      "reason": "page_size is a parameter like any other; leaving it out on the second request is also a difference."
+    },
+    {
+      "name": "a token belongs to its credential",
+      "steps": [
+        {"id": "p1", "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10"}}, "expect": {"status": 200}},
+        {
+          "request": {
+            "path": "/v1/observations",
+            "query": {"series_id": "activity-index", "page_size": "10", "page_token": "${p1.next_page_token}"},
+            "credential": "cred_unentitled"
+          },
+          "expect": {"status": 400, "code": "page_token_mismatch"}
+        }
+      ],
+      "reason": "A token issued to cred_research does not work for another key. Request validation comes before the entitlement check, so the error is the mismatch, not not_entitled."
+    },
+    {
+      "name": "a snapshot expires after an hour",
+      "steps": [
+        {
+          "id": "p1",
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10"}},
+          "expect": {"status": 200, "body": {"snapshot_expires_at": "2026-10-01T01:00:00Z"}}
+        },
+        {"set_clock": "2026-10-01T00:59:59Z"},
+        {
+          "id": "p2",
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10", "page_token": "${p1.next_page_token}"}},
+          "expect": {
+            "status": 200,
+            "body": {
+              "data": [
+                {"observation_id": "obs_nov24"},
+                {"observation_id": "obs_dec24"},
+                {"observation_id": "obs_jan25"},
+                {"observation_id": "obs_feb25"},
+                {"observation_id": "obs_mar25"},
+                {"observation_id": "obs_apr25"},
+                {"observation_id": "obs_may25"},
+                {"observation_id": "obs_jun25"},
+                {"observation_id": "obs_jul25"},
+                {"observation_id": "obs_aug25"}
+              ],
+              "snapshot_expires_at": "2026-10-01T01:00:00Z"
+            }
+          }
+        },
+        {"set_clock": "2026-10-01T01:00:00Z"},
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10", "page_token": "${p2.next_page_token}"}},
+          "expect": {"status": 410, "code": "page_token_expired"}
+        }
+      ],
+      "reason": "A snapshot lives for 3,600 seconds from its first page. A token is accepted while the clock is before snapshot_expires_at."
+    },
+    {
+      "name": "a reset invalidates tokens",
+      "steps": [
+        {"id": "p1", "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10"}}, "expect": {"status": 200}},
+        {"reset": {}},
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10", "page_token": "${p1.next_page_token}"}},
+          "expect": {"status": 400, "code": "invalid_page_token"}
+        }
+      ],
+      "reason": "A reset replaces the key that signs page tokens."
+    },
+    {
+      "name": "a malformed token is refused",
+      "steps": [
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10", "page_token": "not-a-page-token"}},
+          "expect": {"status": 400, "code": "invalid_page_token", "body": {"parameter": "page_token"}}
+        }
+      ],
+      "reason": "Clients must not construct tokens."
+    },
+    {
+      "name": "the page holding the last result has no token",
+      "steps": [
+        {
+          "id": "p1",
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "16"}},
+          "expect": {
+            "status": 200,
+            "body": {
+              "data": [
+                {"observation_id": "obs_jan24"},
+                {"observation_id": "obs_feb24"},
+                {"observation_id": "obs_mar24"},
+                {"observation_id": "obs_apr24"},
+                {"observation_id": "obs_may24"},
+                {"observation_id": "obs_jun24"},
+                {"observation_id": "obs_jul24"},
+                {"observation_id": "obs_aug24"},
+                {"observation_id": "obs_sep24"},
+                {"observation_id": "obs_oct24"},
+                {"observation_id": "obs_nov24"},
+                {"observation_id": "obs_dec24"},
+                {"observation_id": "obs_jan25"},
+                {"observation_id": "obs_feb25"},
+                {"observation_id": "obs_mar25"},
+                {"observation_id": "obs_apr25"}
+              ]
+            }
+          }
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "16", "page_token": "${p1.next_page_token}"}},
+          "expect": {
+            "status": 200,
+            "body": {
+              "data": [
+                {"observation_id": "obs_may25"},
+                {"observation_id": "obs_jun25"},
+                {"observation_id": "obs_jul25"},
+                {"observation_id": "obs_aug25"},
+                {"observation_id": "obs_sep25"},
+                {"observation_id": "obs_oct25"},
+                {"observation_id": "obs_nov25"},
+                {"observation_id": "obs_dec25"},
+                {"observation_id": "obs_jan26"},
+                {"observation_id": "obs_feb26"},
+                {"observation_id": "obs_mar26"},
+                {"observation_id": "obs_apr26"},
+                {"observation_id": "obs_may26"},
+                {"observation_id": "obs_jun26"},
+                {"observation_id": "obs_jul26"},
+                {"observation_id": "obs_aug26"}
+              ],
+              "next_page_token": null
+            }
+          }
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "32"}},
+          "expect": {
+            "status": 200,
+            "body": {
+              "data": [
+                {"observation_id": "obs_jan24"},
+                {"observation_id": "obs_feb24"},
+                {"observation_id": "obs_mar24"},
+                {"observation_id": "obs_apr24"},
+                {"observation_id": "obs_may24"},
+                {"observation_id": "obs_jun24"},
+                {"observation_id": "obs_jul24"},
+                {"observation_id": "obs_aug24"},
+                {"observation_id": "obs_sep24"},
+                {"observation_id": "obs_oct24"},
+                {"observation_id": "obs_nov24"},
+                {"observation_id": "obs_dec24"},
+                {"observation_id": "obs_jan25"},
+                {"observation_id": "obs_feb25"},
+                {"observation_id": "obs_mar25"},
+                {"observation_id": "obs_apr25"},
+                {"observation_id": "obs_may25"},
+                {"observation_id": "obs_jun25"},
+                {"observation_id": "obs_jul25"},
+                {"observation_id": "obs_aug25"},
+                {"observation_id": "obs_sep25"},
+                {"observation_id": "obs_oct25"},
+                {"observation_id": "obs_nov25"},
+                {"observation_id": "obs_dec25"},
+                {"observation_id": "obs_jan26"},
+                {"observation_id": "obs_feb26"},
+                {"observation_id": "obs_mar26"},
+                {"observation_id": "obs_apr26"},
+                {"observation_id": "obs_may26"},
+                {"observation_id": "obs_jun26"},
+                {"observation_id": "obs_jul26"},
+                {"observation_id": "obs_aug26"}
+              ],
+              "next_page_token": null
+            }
+          }
+        }
+      ],
+      "reason": "When the results divide evenly into pages, the last full page has a null next_page_token; a client never receives an empty page."
+    },
+    {
+      "name": "an empty result has no token",
+      "steps": [
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "period_start": "2030-01-01", "period_end": "2030-02-01"}},
+          "expect": {"status": 200, "body": {"data": [], "position": 37, "next_page_token": null}}
+        }
+      ],
+      "reason": "No observation falls in the range. The result is empty, not an error."
+    }
+  ]
+}

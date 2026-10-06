@@ -1,0 +1,27 @@
+{
+  "contract_version": "0.3.0",
+  "case": "late-source-release",
+  "description": "July 2026 was scheduled for August 3 at 12:30 UTC. The source published it late, at 14:05:00, and the provider made it available at 14:06:10.",
+  "checks": [
+    {
+      "name": "when an on-time release would be available",
+      "query": {"series_id": "activity-index", "period_start": "2026-07-01", "period_end": "2026-08-01", "available_as_of": "2026-08-03T12:31:10Z"},
+      "expected": [],
+      "reason": "The source had not published yet."
+    },
+    {
+      "name": "one second before availability",
+      "query": {"series_id": "activity-index", "period_start": "2026-07-01", "period_end": "2026-08-01", "available_as_of": "2026-08-03T14:06:09Z"},
+      "expected": [],
+      "reason": "rev_jul26_1 becomes available at 14:06:10."
+    },
+    {
+      "name": "available",
+      "query": {"series_id": "activity-index", "period_start": "2026-07-01", "period_end": "2026-08-01", "available_as_of": "2026-08-03T14:06:10Z"},
+      "expected": [
+        {"observation_id": "obs_jul26", "revision_id": "rev_jul26_1", "value": "102.2"}
+      ],
+      "reason": "The provider's usual 70 seconds after a late publication."
+    }
+  ]
+}

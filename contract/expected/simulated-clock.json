@@ -1,0 +1,174 @@
+{
+  "contract_version": "0.3.0",
+  "case": "simulated-clock",
+  "description": "The demo API serves only revisions whose available_at is at or before its simulated clock. Test control moves the clock forward and resets it.",
+  "scenarios": [
+    {
+      "name": "meta reports the clock",
+      "clock": "2026-09-10T12:30:20Z",
+      "steps": [
+        {
+          "request": {"path": "/v1/meta", "credential": null},
+          "expect": {
+            "status": 200,
+            "body": {"api_version": "v1", "supported_api_versions": ["v1"], "contract_version": "0.3.0", "server_time": "2026-09-10T12:30:20Z"}
+          }
+        }
+      ],
+      "reason": "server_time is the simulated clock, which the reset set. /v1/meta needs no key."
+    },
+    {
+      "name": "a revision after the clock is invisible",
+      "clock": "2026-09-10T12:30:20Z",
+      "steps": [
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "period_start": "2026-08-01", "period_end": "2026-09-01"}},
+          "expect": {"status": 200, "body": {"data": [{"revision_id": "rev_aug26_1", "value": "102.4"}], "position": 36, "next_page_token": null}}
+        },
+        {"request": {"path": "/v1/datasets/core-indicators"}, "expect": {"status": 200, "body": {"head_position": 36}}},
+        {
+          "request": {"path": "/v1/datasets/core-indicators/changes", "query": {"after": "35"}},
+          "expect": {"status": 200, "body": {"data": [{"sequence": 36, "revision_id": "rev_aug26_1"}], "next_position": 36, "head_position": 36}}
+        }
+      ],
+      "reason": "rev_aug26_2 becomes available at 12:30:40. Until then it is absent from queries, the head position, and the change stream; without a cutoff, the query uses the clock."
+    },
+    {
+      "name": "moving the clock reveals the revision at its available_at",
+      "clock": "2026-09-10T12:30:20Z",
+      "steps": [
+        {"set_clock": "2026-09-10T12:30:39Z"},
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "period_start": "2026-08-01", "period_end": "2026-09-01"}},
+          "expect": {"status": 200, "body": {"data": [{"revision_id": "rev_aug26_1"}], "position": 36}}
+        },
+        {"set_clock": "2026-09-10T12:30:40Z"},
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "period_start": "2026-08-01", "period_end": "2026-09-01"}},
+          "expect": {"status": 200, "body": {"data": [{"revision_id": "rev_aug26_2", "value": "102.1"}], "position": 37}}
+        },
+        {
+          "request": {"path": "/v1/datasets/core-indicators/changes", "query": {"after": "36"}},
+          "expect": {"status": 200, "body": {"data": [{"sequence": 37, "revision_id": "rev_aug26_2"}], "next_position": 37, "head_position": 37}}
+        }
+      ],
+      "reason": "Visibility is inclusive: the revision appears when the clock reaches its available_at."
+    },
+    {
+      "name": "the clock does not move backwards",
+      "clock": "2026-09-10T12:30:20Z",
+      "steps": [
+        {
+          "request": {"method": "PUT", "path": "/test/clock", "credential": "cred_test_control", "body": {"now": "2026-09-10T12:30:19Z"}},
+          "expect": {"status": 409, "code": "clock_backwards", "body": {"parameter": "now"}}
+        },
+        {"request": {"path": "/test/clock", "credential": "cred_test_control"}, "expect": {"status": 200, "body": {"now": "2026-09-10T12:30:20Z"}}},
+        {
+          "request": {"method": "PUT", "path": "/test/clock", "credential": "cred_test_control", "body": {"now": "2026-09-10T12:30:20Z"}},
+          "expect": {"status": 200, "body": {"now": "2026-09-10T12:30:20Z"}}
+        }
+      ],
+      "reason": "PUT /test/clock only moves forward, and the refusal names now; the current time is accepted and changes nothing."
+    },
+    {
+      "name": "the clock moves to its latest value and no further",
+      "steps": [
+        {
+          "request": {"method": "PUT", "path": "/test/clock", "credential": "cred_test_control", "body": {"now": "9999-12-31T00:00:00Z"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "now"}}
+        },
+        {
+          "request": {"method": "PUT", "path": "/test/clock", "credential": "cred_test_control", "body": {"now": "9999-12-30T23:59:59Z"}},
+          "expect": {"status": 200, "body": {"now": "9999-12-30T23:59:59Z"}}
+        }
+      ],
+      "reason": "9999-12-30T23:59:59Z is the latest clock: an export created then expires at 9999-12-31T23:59:59Z, the last instant the timestamp format can express. One second later is refused as an invalid now."
+    },
+    {
+      "name": "a reset without a clock restores the start",
+      "clock": "2026-09-10T12:30:20Z",
+      "steps": [
+        {"reset": {}},
+        {"request": {"path": "/test/clock", "credential": "cred_test_control"}, "expect": {"status": 200, "body": {"now": "2026-10-01T00:00:00Z"}}},
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "period_start": "2026-08-01", "period_end": "2026-09-01"}},
+          "expect": {"status": 200, "body": {"data": [{"revision_id": "rev_aug26_2"}], "position": 37}}
+        }
+      ],
+      "reason": "The runner starts the server with the default CLOCK_START, 2026-10-01T00:00:00Z."
+    },
+    {
+      "name": "a reset can move the clock back",
+      "steps": [
+        {"reset": {"clock": "2025-06-20T16:01:09Z"}},
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "period_start": "2025-05-01", "period_end": "2025-06-01"}},
+          "expect": {"status": 200, "body": {"data": [{"revision_id": "rev_may25_1", "value": "100.6"}], "position": 17}}
+        },
+        {"request": {"path": "/v1/datasets/core-indicators"}, "expect": {"status": 200, "body": {"head_position": 17}}}
+      ],
+      "reason": "One second before the May 2025 withdrawal becomes available, the head position is 17 and the initial release is current."
+    },
+    {
+      "name": "a reset accepts the latest clock and no later",
+      "steps": [
+        {
+          "request": {"method": "POST", "path": "/test/reset", "credential": "cred_test_control", "body": {"clock": "9999-12-31T00:00:00Z"}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "clock"}}
+        },
+        {
+          "request": {"method": "POST", "path": "/test/reset", "credential": "cred_test_control", "body": {"clock": "9999-12-30T23:59:59Z"}},
+          "expect": {"status": 200, "body": {"now": "9999-12-30T23:59:59Z"}}
+        }
+      ],
+      "reason": "A reset may move the clock anywhere up to 9999-12-30T23:59:59Z, the latest clock whose derived timestamps fit the timestamp format. One second later is refused as an invalid clock."
+    },
+    {
+      "name": "before the first revision",
+      "clock": "2024-01-01T00:00:00Z",
+      "steps": [
+        {"request": {"path": "/v1/datasets/core-indicators"}, "expect": {"status": 200, "body": {"head_position": 0}}},
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index"}},
+          "expect": {"status": 200, "body": {"data": [], "position": 0, "next_page_token": null}}
+        },
+        {
+          "request": {"path": "/v1/datasets/core-indicators/changes", "query": {"after": "0"}},
+          "expect": {"status": 200, "body": {"data": [], "next_position": 0, "head_position": 0}}
+        }
+      ],
+      "reason": "No revision is available before 2024-02-03T12:31:10Z. The head position is 0, and an empty result is still a success."
+    },
+    {
+      "name": "a cutoff after the clock is refused",
+      "clock": "2026-09-10T12:30:20Z",
+      "steps": [
+        {
+          "request": {
+            "path": "/v1/observations",
+            "query": {
+              "series_id": "activity-index",
+              "period_start": "2026-08-01",
+              "period_end": "2026-09-01",
+              "available_as_of": "2026-09-10T12:30:40Z"
+            }
+          },
+          "expect": {"status": 400, "code": "cutoff_in_future", "body": {"parameter": "available_as_of"}}
+        },
+        {
+          "request": {
+            "path": "/v1/observations",
+            "query": {
+              "series_id": "activity-index",
+              "period_start": "2026-08-01",
+              "period_end": "2026-09-01",
+              "available_as_of": "2026-09-10T12:30:20Z"
+            }
+          },
+          "expect": {"status": 200, "body": {"data": [{"revision_id": "rev_aug26_1"}]}}
+        }
+      ],
+      "reason": "An answer for a later instant could still change. A cutoff equal to the clock is accepted."
+    }
+  ]
+}

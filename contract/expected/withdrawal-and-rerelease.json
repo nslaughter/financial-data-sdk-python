@@ -1,0 +1,53 @@
+{
+  "contract_version": "0.3.0",
+  "case": "withdrawal-and-rerelease",
+  "description": "May 2025 is released as 100.6, withdrawn by the source on June 20 after a collection error, and re-released as 100.1 with the June release on July 3. While withdrawn, the observation is returned as the withdrawal revision, with a null value.",
+  "checks": [
+    {
+      "name": "one second before release",
+      "query": {"series_id": "activity-index", "period_start": "2025-05-01", "period_end": "2025-06-01", "available_as_of": "2025-06-03T12:31:09Z"},
+      "expected": [],
+      "reason": "rev_may25_1 becomes available at 12:31:10."
+    },
+    {
+      "name": "initial release",
+      "query": {"series_id": "activity-index", "period_start": "2025-05-01", "period_end": "2025-06-01", "available_as_of": "2025-06-10T00:00:00Z"},
+      "expected": [
+        {"observation_id": "obs_may25", "revision_id": "rev_may25_1", "value": "100.6"}
+      ],
+      "reason": "Only rev_may25_1 is available."
+    },
+    {
+      "name": "withdrawn at the exact instant",
+      "query": {"series_id": "activity-index", "period_start": "2025-05-01", "period_end": "2025-06-01", "available_as_of": "2025-06-20T16:01:10Z"},
+      "expected": [
+        {"observation_id": "obs_may25", "revision_id": "rev_may25_2", "value": null, "missing_reason": null, "change_type": "withdrawal"}
+      ],
+      "reason": "The selected revision is the withdrawal rev_may25_2. It is returned so the customer can tell the observation was withdrawn, not never released."
+    },
+    {
+      "name": "while withdrawn",
+      "query": {"series_id": "activity-index", "period_start": "2025-05-01", "period_end": "2025-06-01", "available_as_of": "2025-06-25T00:00:00Z"},
+      "expected": [
+        {"observation_id": "obs_may25", "revision_id": "rev_may25_2", "value": null, "missing_reason": null, "change_type": "withdrawal"}
+      ],
+      "reason": "The withdrawal is still the selected revision."
+    },
+    {
+      "name": "re-released",
+      "query": {"series_id": "activity-index", "period_start": "2025-05-01", "period_end": "2025-06-01", "available_as_of": "2025-07-03T12:31:10Z"},
+      "expected": [
+        {"observation_id": "obs_may25", "revision_id": "rev_may25_3", "value": "100.1"}
+      ],
+      "reason": "rev_may25_3 has the highest revision_number among the available revisions."
+    },
+    {
+      "name": "latest",
+      "query": {"series_id": "activity-index", "period_start": "2025-05-01", "period_end": "2025-06-01", "available_as_of": null},
+      "expected": [
+        {"observation_id": "obs_may25", "revision_id": "rev_may25_3", "value": "100.1"}
+      ],
+      "reason": "No later revision exists."
+    }
+  ]
+}

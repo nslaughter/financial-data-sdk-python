@@ -1,0 +1,209 @@
+{
+  "contract_version": "0.3.0",
+  "case": "access-control",
+  "description": "Every /v1 request except /v1/meta needs an active customer key, and every data request needs an entitlement to the dataset, checked again on resumed pages.",
+  "scenarios": [
+    {
+      "name": "meta needs no key",
+      "steps": [
+        {"request": {"path": "/v1/meta", "credential": null}, "expect": {"status": 200, "body": {"api_version": "v1", "contract_version": "0.3.0"}}}
+      ],
+      "reason": "The readiness check works before a client has credentials."
+    },
+    {
+      "name": "a request without a key is refused",
+      "steps": [
+        {
+          "request": {"path": "/v1/series", "credential": null},
+          "expect": {"status": 401, "code": "unauthenticated", "headers": {"WWW-Authenticate": "Bearer"}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index"}, "credential": null},
+          "expect": {"status": 401, "code": "unauthenticated", "headers": {"WWW-Authenticate": "Bearer"}}
+        },
+        {
+          "request": {"path": "/v1/datasets/core-indicators/changes", "query": {"after": "0"}, "credential": null},
+          "expect": {"status": 401, "code": "unauthenticated", "headers": {"WWW-Authenticate": "Bearer"}}
+        }
+      ],
+      "reason": "Every /v1 endpoint except /v1/meta requires a customer key."
+    },
+    {
+      "name": "unknown keys and malformed headers are refused",
+      "steps": [
+        {"request": {"path": "/v1/series", "authorization": "Bearer not-a-demo-key"}, "expect": {"status": 401, "code": "unauthenticated"}},
+        {"request": {"path": "/v1/series", "authorization": "Basic ZGVtbzpkZW1v"}, "expect": {"status": 401, "code": "unauthenticated"}},
+        {"request": {"path": "/v1/series", "authorization": "Bearer"}, "expect": {"status": 401, "code": "unauthenticated"}},
+        {"request": {"path": "/v1/series", "authorization": "demo-research-key"}, "expect": {"status": 401, "code": "unauthenticated"}}
+      ],
+      "reason": "Only \"Bearer <api_key>\" with a known key is accepted."
+    },
+    {
+      "name": "the scheme name is case-insensitive",
+      "steps": [
+        {
+          "request": {"path": "/v1/series", "authorization": "bearer demo-research-key"},
+          "expect": {"status": 200, "body": {"data": [{"series_id": "activity-index"}]}}
+        }
+      ],
+      "reason": "HTTP authentication scheme names are case-insensitive; the key is compared exactly."
+    },
+    {
+      "name": "keys are accepted only by their own kind",
+      "steps": [
+        {"request": {"path": "/v1/series", "credential": "cred_test_control"}, "expect": {"status": 401, "code": "unauthenticated"}},
+        {"request": {"path": "/test/clock", "credential": "cred_research"}, "expect": {"status": 401, "code": "unauthenticated"}}
+      ],
+      "reason": "The test-control key cannot read customer data, and a customer key cannot drive the clock."
+    },
+    {
+      "name": "the catalog is visible without entitlement",
+      "steps": [
+        {
+          "request": {"path": "/v1/datasets", "credential": "cred_unentitled"},
+          "expect": {"status": 200, "body": {"data": [{"dataset_id": "core-indicators", "entitled": false, "head_position": null}]}}
+        },
+        {
+          "request": {"path": "/v1/datasets/core-indicators", "credential": "cred_unentitled"},
+          "expect": {"status": 200, "body": {"dataset_id": "core-indicators", "entitled": false, "head_position": null}}
+        },
+        {
+          "request": {"path": "/v1/series", "credential": "cred_unentitled"},
+          "expect": {"status": 200, "body": {"data": [{"series_id": "activity-index", "dataset_id": "core-indicators", "entitled": false}]}}
+        },
+        {
+          "request": {"path": "/v1/series/activity-index", "credential": "cred_unentitled"},
+          "expect": {"status": 200, "body": {"series_id": "activity-index", "entitled": false}}
+        },
+        {
+          "request": {"path": "/v1/datasets"},
+          "expect": {"status": 200, "body": {"data": [{"dataset_id": "core-indicators", "entitled": true, "head_position": 37}]}}
+        },
+        {
+          "request": {"path": "/v1/series/activity-index"},
+          "expect": {"status": 200, "body": {"series_id": "activity-index", "unit": "index_points", "entitled": true}}
+        }
+      ],
+      "reason": "Any valid customer key can discover what exists. The head position is withheld from a key without entitlement."
+    },
+    {
+      "name": "data is refused without entitlement",
+      "steps": [
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index"}, "credential": "cred_unentitled"},
+          "expect": {"status": 403, "code": "not_entitled"}
+        },
+        {
+          "request": {"path": "/v1/datasets/core-indicators/changes", "query": {"after": "0"}, "credential": "cred_unentitled"},
+          "expect": {"status": 403, "code": "not_entitled"}
+        }
+      ],
+      "reason": "A valid key without an entitlement to core-indicators is refused, which a client can tell apart from an empty result."
+    },
+    {
+      "name": "an empty result is not a refusal",
+      "steps": [
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "period_start": "2030-01-01", "period_end": "2030-02-01"}},
+          "expect": {"status": 200, "body": {"data": [], "next_page_token": null}}
+        }
+      ],
+      "reason": "A synchronization job must not record a refusal as success, or an empty result as failure."
+    },
+    {
+      "name": "unknown series and datasets are not found",
+      "steps": [
+        {"request": {"path": "/v1/observations", "query": {"series_id": "no-such-series"}}, "expect": {"status": 404, "code": "not_found"}},
+        {"request": {"path": "/v1/series/no-such-series"}, "expect": {"status": 404, "code": "not_found"}},
+        {"request": {"path": "/v1/datasets/no-such-dataset"}, "expect": {"status": 404, "code": "not_found"}},
+        {"request": {"path": "/v1/datasets/no-such-dataset/changes", "query": {"after": "0"}}, "expect": {"status": 404, "code": "not_found"}}
+      ],
+      "reason": "A missing resource is reported as not found, distinct from a refusal and from an empty result."
+    },
+    {
+      "name": "a revoked key is refused on a resumed page",
+      "steps": [
+        {"id": "p1", "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10"}}, "expect": {"status": 200}},
+        {"set_credential": {"credential_id": "cred_research", "active": false}},
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10", "page_token": "${p1.next_page_token}"}},
+          "expect": {"status": 401, "code": "unauthenticated"}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10"}},
+          "expect": {"status": 401, "code": "unauthenticated"}
+        }
+      ],
+      "reason": "A token issued before the key was revoked grants nothing; the key is checked on every request."
+    },
+    {
+      "name": "a removed entitlement is enforced on a resumed page",
+      "steps": [
+        {"id": "p1", "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10"}}, "expect": {"status": 200}},
+        {"set_credential": {"credential_id": "cred_research", "datasets": []}},
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "page_size": "10", "page_token": "${p1.next_page_token}"}},
+          "expect": {"status": 403, "code": "not_entitled"}
+        },
+        {"request": {"path": "/v1/datasets/core-indicators/changes", "query": {"after": "0"}}, "expect": {"status": 403, "code": "not_entitled"}},
+        {"request": {"path": "/v1/datasets/core-indicators"}, "expect": {"status": 200, "body": {"entitled": false, "head_position": null}}}
+      ],
+      "reason": "Entitlements are checked at the moment of each request."
+    },
+    {
+      "name": "a granted entitlement takes effect at once",
+      "steps": [
+        {
+          "request": {
+            "path": "/v1/observations",
+            "query": {"series_id": "activity-index", "period_start": "2026-08-01", "period_end": "2026-09-01"},
+            "credential": "cred_unentitled"
+          },
+          "expect": {"status": 403, "code": "not_entitled"}
+        },
+        {"set_credential": {"credential_id": "cred_unentitled", "datasets": ["core-indicators"]}},
+        {
+          "request": {
+            "path": "/v1/observations",
+            "query": {"series_id": "activity-index", "period_start": "2026-08-01", "period_end": "2026-09-01"},
+            "credential": "cred_unentitled"
+          },
+          "expect": {"status": 200, "body": {"data": [{"revision_id": "rev_aug26_2"}]}}
+        }
+      ],
+      "reason": "Test control changes a credential until the next reset."
+    },
+    {
+      "name": "a reset restores credentials",
+      "steps": [
+        {"set_credential": {"credential_id": "cred_research", "active": false}},
+        {"reset": {}},
+        {"request": {"path": "/v1/series"}, "expect": {"status": 200, "body": {"data": [{"series_id": "activity-index", "entitled": true}]}}}
+      ],
+      "reason": "The reset restores every credential from the fixture."
+    },
+    {
+      "name": "test control cannot change its own credential",
+      "steps": [
+        {
+          "request": {"method": "PUT", "path": "/test/credentials/cred_test_control", "credential": "cred_test_control", "body": {"active": false}},
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "credential_id"}}
+        },
+        {
+          "request": {"method": "PUT", "path": "/test/credentials/no-such-credential", "credential": "cred_test_control", "body": {"active": false}},
+          "expect": {"status": 404, "code": "not_found"}
+        },
+        {
+          "request": {
+            "method": "PUT",
+            "path": "/test/credentials/cred_research",
+            "credential": "cred_test_control",
+            "body": {"datasets": ["no-such-dataset"]}
+          },
+          "expect": {"status": 400, "code": "invalid_parameter", "body": {"parameter": "datasets"}}
+        }
+      ],
+      "reason": "Only customer credentials can be changed, and only to datasets that exist. Each refusal names the parameter at fault: credential_id, a path parameter, or datasets."
+    }
+  ]
+}
