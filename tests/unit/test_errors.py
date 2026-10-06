@@ -421,6 +421,23 @@ def test_text_where_redacting_forms_the_key_again_is_replaced_whole(
     assert redact(text, key) == "[redacted]"
 
 
+def test_key_in_the_repr_of_a_decoded_string_is_redacted() -> None:
+    # A gateway wrote the key into JSON unescaped, so its \t decoded to a
+    # tab. The text then lacks the key, but its repr writes the tab as \t.
+    key = "sk_live\\t9Qz"
+    body = b'{"code": "unauthenticated", "detail": "Bearer sk_live\\t9Qz is bad"}'
+    error = error_for(401, body, secret=key)
+    assert error.detail == "[redacted]"
+    assert error.problem == {"code": "unauthenticated", "detail": "[redacted]"}
+    assert_without_key(error, key)
+
+
+def test_member_names_that_redact_to_the_same_text_keep_the_later_value() -> None:
+    body = json.dumps({"code": "internal", KEY: 1, "[redacted]": 2}).encode()
+    error = error_for(500, body)
+    assert error.problem == {"code": "internal", "[redacted]": 2}
+
+
 def test_key_spanning_the_code_and_the_detail_is_redacted() -> None:
     key = "found:"
     error = error_for(404, problem_body(404, "not_found", detail="No such series."))
@@ -445,7 +462,7 @@ def test_key_spanning_the_request_id_and_the_text_after_it_is_redacted() -> None
 
 
 def test_key_spanning_the_status_and_the_reason_is_redacted() -> None:
-    key = "302: a"
+    key = "302:"
     error = unexpected_response(
         "a 302 response",
         status=302,
@@ -455,7 +472,7 @@ def test_key_spanning_the_status_and_the_reason_is_redacted() -> None:
         attempts=1,
         secret=key,
     )
-    assert str(error) == f"[redacted] 302 response (GET {PATH})"
+    assert str(error) == f"[redacted] a 302 response (GET {PATH})"
     assert_without_key(error, key)
 
 

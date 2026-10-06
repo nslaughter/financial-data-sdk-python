@@ -240,19 +240,25 @@ def redact(text: str, secret: str) -> str:
     """Replace every occurrence of the key in text with `[redacted]`.
 
     A key with `[` or `]` in it can form again where `[redacted]` meets the
-    text beside it, as the key `x[` does in `xx[`. Keeping the key out comes
-    before keeping the text exact, so such text is replaced whole.
+    text beside it, as the key `x[` does in `xx[`. A key with `\\` in it can
+    be in the text's `repr` though not in the text, as the key `a\\tb` is
+    when a response's JSON held it unescaped and `\\t` decoded to a tab.
+    Keeping the key out comes before keeping the text exact, so such text is
+    replaced whole.
     """
     redacted = text.replace(secret, REDACTED)
-    return REDACTED if secret in redacted else redacted
+    if secret in redacted or secret in repr(redacted):
+        return REDACTED
+    return redacted
 
 
 def _redact_json(document: dict[str, Any], secret: str) -> dict[str, Any]:
     """Copy a JSON object with the key replaced in every string, at any depth.
 
-    Member names are strings too. The copy walks the document with a stack
-    instead of recursion, so a body nested as deeply as the JSON parser
-    accepts cannot exhaust Python's.
+    Member names are strings too, so two names can become the same, and
+    the later member's value is kept, as when JSON repeats a name. The copy
+    walks the document with a stack instead of recursion, so a body nested
+    as deeply as the JSON parser accepts cannot exhaust Python's.
     """
     root: dict[str, Any] = {}
     pending: list[tuple[Any, Any]] = [(document, root)]
