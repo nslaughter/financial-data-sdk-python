@@ -741,7 +741,6 @@ def test_body_that_is_not_marked_json_is_refused(content_type: str | None) -> No
         b'{"a": Infinity}',
         b'{"a": -Infinity}',
         b'{"a": "\xff"}',
-        b"[" * 100_000 + b"]" * 100_000,
         KEY.encode(),
     ],
     ids=[
@@ -753,7 +752,6 @@ def test_body_that_is_not_marked_json_is_refused(content_type: str | None) -> No
         "infinity",
         "negative-infinity",
         "invalid-utf-8",
-        "deeply-nested",
         "key",
     ],
 )
@@ -764,6 +762,30 @@ def test_body_that_is_not_json_is_refused(body: bytes) -> None:
     assert str(error) == "the response's body is not JSON"
     assert error.__cause__ is None
     assert error.__context__ is None
+
+
+def test_body_too_deep_to_parse_is_not_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    def too_deep(*args: object, **kwargs: object) -> object:
+        raise RecursionError("maximum recursion depth exceeded")
+
+    monkeypatch.setattr(json, "loads", too_deep)
+    with pytest.raises(InvalidResponse) as caught:
+        decode_object("application/json", b"[[[]]]")
+    assert str(caught.value) == "the response's body is not JSON"
+    assert caught.value.__context__ is None
+
+
+def test_deeply_nested_body_is_refused() -> None:
+    # How deep the parser goes depends on the Python version and the
+    # platform's stack, so the body is refused either as too deep to parse
+    # or as an array.
+    body = b"[" * 100_000 + b"]" * 100_000
+    with pytest.raises(InvalidResponse) as caught:
+        decode_object("application/json", body)
+    assert str(caught.value) in (
+        "the response's body is not JSON",
+        "the response's body must be a JSON object, not an array",
+    )
 
 
 @pytest.mark.parametrize(
