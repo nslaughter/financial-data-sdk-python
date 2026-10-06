@@ -203,6 +203,23 @@ different data model.
 - *Shipping an API change your customers can adopt confidently*: an article
   on the migration stage, also in preparation.
 
+## License
+
+This project is source available under a custom license, the
+[Nathan Slaughter Personal Use License](LICENSE) (`LicenseRef-NSPUL-1.0`).
+It is not open source.
+
+- Anyone may read the source, including on behalf of an organization.
+- An individual may run it, and change it privately, for their own personal
+  use, such as learning, study, and personal projects.
+- Everything else needs my written permission first: use by or for an
+  organization, including evaluating this project or my services; use in a
+  business; and publishing, redistributing, packaging, or hosting the
+  project, or putting its code in another project.
+
+Ask for permission at git@nathanslaughter.com. The [LICENSE](LICENSE)
+controls; this summary doesn't change it.
+
 ## Work with me on an SDK your customers can use
 
 I take on SDK projects scoped around the workflows your customers need to
