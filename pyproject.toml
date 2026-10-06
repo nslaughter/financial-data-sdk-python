@@ -3,6 +3,9 @@ name = "financial-data-sdk"
 dynamic = ["version"]
 description = "A Python SDK for the demo financial data API: data available at a cutoff, resumable pages, and the change stream."
 readme = "README.md"
+# Source available under a custom license, not open source.
+license = "LicenseRef-NSPUL-1.0"
+license-files = ["LICENSE"]
 authors = [{ name = "Nathan Slaughter" }]
 requires-python = ">=3.11"
 # httpx is the only runtime dependency (D1). Its types are part of the public
