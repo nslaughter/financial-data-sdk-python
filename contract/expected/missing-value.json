@@ -1,0 +1,29 @@
+{
+  "contract_version": "0.3.0",
+  "case": "missing-value",
+  "description": "The source released October 2024 without a value because the data was not collected. A null value with a reason is an observation; it differs from an absent observation.",
+  "checks": [
+    {
+      "name": "before release",
+      "query": {"series_id": "activity-index", "period_start": "2024-10-01", "period_end": "2024-11-01", "available_as_of": "2024-11-03T12:31:09Z"},
+      "expected": [],
+      "reason": "No revision of obs_oct24 is available yet, so the observation is absent."
+    },
+    {
+      "name": "released without a value",
+      "query": {"series_id": "activity-index", "period_start": "2024-10-01", "period_end": "2024-11-01", "available_as_of": "2024-11-03T12:31:10Z"},
+      "expected": [
+        {"observation_id": "obs_oct24", "revision_id": "rev_oct24_1", "value": null, "missing_reason": "not_collected"}
+      ],
+      "reason": "The observation exists and is returned with a null value and its reason."
+    },
+    {
+      "name": "latest",
+      "query": {"series_id": "activity-index", "period_start": "2024-10-01", "period_end": "2024-11-01", "available_as_of": null},
+      "expected": [
+        {"observation_id": "obs_oct24", "revision_id": "rev_oct24_1", "value": null, "missing_reason": "not_collected"}
+      ],
+      "reason": "No later revision exists."
+    }
+  ]
+}

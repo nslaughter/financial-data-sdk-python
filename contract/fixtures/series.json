@@ -1,0 +1,17 @@
+{
+  "contract_version": "0.3.0",
+  "series": [
+    {
+      "series_id": "activity-index",
+      "dataset_id": "core-indicators",
+      "name": "Activity index (synthetic)",
+      "description": "A fictional monthly index of economic activity created for this demonstration. It describes no real economy, source, or provider.",
+      "frequency": "monthly",
+      "unit": "index_points",
+      "base_period": "2025 = 100",
+      "seasonal_adjustment": "seasonally_adjusted",
+      "source": "Fictional statistics office (synthetic)",
+      "release_schedule": "Third day of the following month at 12:30 UTC"
+    }
+  ]
+}

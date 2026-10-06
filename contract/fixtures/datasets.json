@@ -1,0 +1,10 @@
+{
+  "contract_version": "0.3.0",
+  "datasets": [
+    {
+      "dataset_id": "core-indicators",
+      "name": "Core indicators (synthetic)",
+      "description": "Synthetic economic indicators created for this demonstration. Entitlements are granted per dataset."
+    }
+  ]
+}

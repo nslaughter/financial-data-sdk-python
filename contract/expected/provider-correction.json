@@ -1,0 +1,39 @@
+{
+  "contract_version": "0.3.0",
+  "case": "provider-correction",
+  "description": "The provider divided the source's February 2026 value by one hundred in error and served 1.013. It corrected the value to the source's 101.3 on March 5. A cutoff before the correction returns what the API actually served.",
+  "checks": [
+    {
+      "name": "erroneous value as served",
+      "query": {"series_id": "activity-index", "period_start": "2026-02-01", "period_end": "2026-03-01", "available_as_of": "2026-03-04T00:00:00Z"},
+      "expected": [
+        {"observation_id": "obs_feb26", "revision_id": "rev_feb26_1", "value": "1.013"}
+      ],
+      "reason": "Reproducing research done on March 4 requires the value the API served then, including the error."
+    },
+    {
+      "name": "one second before the correction",
+      "query": {"series_id": "activity-index", "period_start": "2026-02-01", "period_end": "2026-03-01", "available_as_of": "2026-03-05T15:19:59Z"},
+      "expected": [
+        {"observation_id": "obs_feb26", "revision_id": "rev_feb26_1", "value": "1.013"}
+      ],
+      "reason": "rev_feb26_2 becomes available at 15:20:00."
+    },
+    {
+      "name": "corrected",
+      "query": {"series_id": "activity-index", "period_start": "2026-02-01", "period_end": "2026-03-01", "available_as_of": "2026-03-05T15:20:00Z"},
+      "expected": [
+        {"observation_id": "obs_feb26", "revision_id": "rev_feb26_2", "value": "101.3", "change_type": "provider_correction", "published_at": "2026-03-03T12:30:00Z", "received_at": "2026-03-03T12:30:04Z"}
+      ],
+      "reason": "The correction keeps the source's publication and the provider's receipt times; only available_at reflects the correction."
+    },
+    {
+      "name": "latest",
+      "query": {"series_id": "activity-index", "period_start": "2026-02-01", "period_end": "2026-03-01", "available_as_of": null},
+      "expected": [
+        {"observation_id": "obs_feb26", "revision_id": "rev_feb26_2", "value": "101.3"}
+      ],
+      "reason": "No later revision exists."
+    }
+  ]
+}

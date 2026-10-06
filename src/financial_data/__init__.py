@@ -1,0 +1,67 @@
+"""A Python SDK for the demo financial data API."""
+
+from ._client import Client
+from ._config import RetryPolicy
+from ._errors import (
+    APIError,
+    AuthenticationError,
+    ClientClosedError,
+    ConfigError,
+    DeadlineExceededError,
+    FinancialDataError,
+    InvalidRequestError,
+    NotEntitledError,
+    NotFoundError,
+    PageTokenError,
+    PageTokenExpiredError,
+    PositionAheadError,
+    PositionExpiredError,
+    RateLimitError,
+    ServerError,
+    TransportError,
+    UnexpectedResponseError,
+    UnsupportedAPIVersionError,
+)
+from ._records import (
+    ChangePage,
+    ChangeType,
+    Dataset,
+    Meta,
+    MissingReason,
+    ObservationPage,
+    Revision,
+    Series,
+)
+from ._version import __version__
+
+__all__ = [
+    "APIError",
+    "AuthenticationError",
+    "ChangePage",
+    "ChangeType",
+    "Client",
+    "ClientClosedError",
+    "ConfigError",
+    "Dataset",
+    "DeadlineExceededError",
+    "FinancialDataError",
+    "InvalidRequestError",
+    "Meta",
+    "MissingReason",
+    "NotEntitledError",
+    "NotFoundError",
+    "ObservationPage",
+    "PageTokenError",
+    "PageTokenExpiredError",
+    "PositionAheadError",
+    "PositionExpiredError",
+    "RateLimitError",
+    "RetryPolicy",
+    "Revision",
+    "Series",
+    "ServerError",
+    "TransportError",
+    "UnexpectedResponseError",
+    "UnsupportedAPIVersionError",
+    "__version__",
+]

@@ -1,0 +1,58 @@
+{
+  "contract_version": "0.3.0",
+  "case": "release-timing",
+  "description": "Scheduled, published, and first-available times for releases a delivery monitor must classify. first_published_at is the earliest published_at among the period's revisions. first_available_at is the earliest available_at. source_delay_seconds is first_published_at minus scheduled_at. availability_delay_seconds is first_available_at minus first_published_at.",
+  "checks": [
+    {
+      "name": "on time",
+      "period_start": "2026-08-01",
+      "expected": {
+        "scheduled_at": "2026-09-03T12:30:00Z",
+        "first_published_at": "2026-09-03T12:30:00Z",
+        "first_available_at": "2026-09-03T12:31:10Z",
+        "first_available_revision_id": "rev_aug26_1",
+        "source_delay_seconds": 0,
+        "availability_delay_seconds": 70
+      }
+    },
+    {
+      "name": "on time without a value",
+      "period_start": "2024-10-01",
+      "expected": {
+        "scheduled_at": "2024-11-03T12:30:00Z",
+        "first_published_at": "2024-11-03T12:30:00Z",
+        "first_available_at": "2024-11-03T12:31:10Z",
+        "first_available_revision_id": "rev_oct24_1",
+        "source_delay_seconds": 0,
+        "availability_delay_seconds": 70
+      },
+      "reason": "A release with a null value still arrived on time."
+    },
+    {
+      "name": "late at the source",
+      "period_start": "2026-07-01",
+      "expected": {
+        "scheduled_at": "2026-08-03T12:30:00Z",
+        "first_published_at": "2026-08-03T14:05:00Z",
+        "first_available_at": "2026-08-03T14:06:10Z",
+        "first_available_revision_id": "rev_jul26_1",
+        "source_delay_seconds": 5700,
+        "availability_delay_seconds": 70
+      },
+      "reason": "The delay is the source's; the provider took its usual 70 seconds."
+    },
+    {
+      "name": "late at the provider",
+      "period_start": "2025-11-01",
+      "expected": {
+        "scheduled_at": "2025-12-03T12:30:00Z",
+        "first_published_at": "2025-12-03T12:30:00Z",
+        "first_available_at": "2025-12-04T12:31:10Z",
+        "first_available_revision_id": "rev_nov25_2",
+        "source_delay_seconds": 0,
+        "availability_delay_seconds": 86470
+      },
+      "reason": "The source published on time. The first version a customer could retrieve was the next day's revision, not the initial release."
+    }
+  ]
+}

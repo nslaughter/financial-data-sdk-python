@@ -1,0 +1,147 @@
+{
+  "contract_version": "0.3.0",
+  "case": "release-calendar",
+  "description": "GET /v1/release-calendar returns the scheduled releases of a series.",
+  "scenarios": [
+    {
+      "name": "a single release",
+      "steps": [
+        {
+          "request": {
+            "path": "/v1/release-calendar",
+            "query": {"series_id": "activity-index", "period_start": "2026-07-01", "period_end": "2026-08-01"}
+          },
+          "expect": {
+            "status": 200,
+            "body": {
+              "data": [
+                {"series_id": "activity-index", "period_start": "2026-07-01", "period_end": "2026-08-01", "scheduled_at": "2026-08-03T12:30:00Z"}
+              ]
+            }
+          }
+        }
+      ],
+      "reason": "July 2026 was scheduled for August 3 at 12:30; the source published it late."
+    },
+    {
+      "name": "the whole calendar",
+      "steps": [
+        {
+          "request": {"path": "/v1/release-calendar", "query": {"series_id": "activity-index"}},
+          "expect": {
+            "status": 200,
+            "body": {
+              "data": [
+                {"period_start": "2024-01-01", "scheduled_at": "2024-02-03T12:30:00Z"},
+                {"period_start": "2024-02-01", "scheduled_at": "2024-03-03T12:30:00Z"},
+                {"period_start": "2024-03-01", "scheduled_at": "2024-04-03T12:30:00Z"},
+                {"period_start": "2024-04-01", "scheduled_at": "2024-05-03T12:30:00Z"},
+                {"period_start": "2024-05-01", "scheduled_at": "2024-06-03T12:30:00Z"},
+                {"period_start": "2024-06-01", "scheduled_at": "2024-07-03T12:30:00Z"},
+                {"period_start": "2024-07-01", "scheduled_at": "2024-08-03T12:30:00Z"},
+                {"period_start": "2024-08-01", "scheduled_at": "2024-09-03T12:30:00Z"},
+                {"period_start": "2024-09-01", "scheduled_at": "2024-10-03T12:30:00Z"},
+                {"period_start": "2024-10-01", "scheduled_at": "2024-11-03T12:30:00Z"},
+                {"period_start": "2024-11-01", "scheduled_at": "2024-12-03T12:30:00Z"},
+                {"period_start": "2024-12-01", "scheduled_at": "2025-01-03T12:30:00Z"},
+                {"period_start": "2025-01-01", "scheduled_at": "2025-02-03T12:30:00Z"},
+                {"period_start": "2025-02-01", "scheduled_at": "2025-03-03T12:30:00Z"},
+                {"period_start": "2025-03-01", "scheduled_at": "2025-04-03T12:30:00Z"},
+                {"period_start": "2025-04-01", "scheduled_at": "2025-05-03T12:30:00Z"},
+                {"period_start": "2025-05-01", "scheduled_at": "2025-06-03T12:30:00Z"},
+                {"period_start": "2025-06-01", "scheduled_at": "2025-07-03T12:30:00Z"},
+                {"period_start": "2025-07-01", "scheduled_at": "2025-08-03T12:30:00Z"},
+                {"period_start": "2025-08-01", "scheduled_at": "2025-09-03T12:30:00Z"},
+                {"period_start": "2025-09-01", "scheduled_at": "2025-10-03T12:30:00Z"},
+                {"period_start": "2025-10-01", "scheduled_at": "2025-11-03T12:30:00Z"},
+                {"period_start": "2025-11-01", "scheduled_at": "2025-12-03T12:30:00Z"},
+                {"period_start": "2025-12-01", "scheduled_at": "2026-01-03T12:30:00Z"},
+                {"period_start": "2026-01-01", "scheduled_at": "2026-02-03T12:30:00Z"},
+                {"period_start": "2026-02-01", "scheduled_at": "2026-03-03T12:30:00Z"},
+                {"period_start": "2026-03-01", "scheduled_at": "2026-04-03T12:30:00Z"},
+                {"period_start": "2026-04-01", "scheduled_at": "2026-05-03T12:30:00Z"},
+                {"period_start": "2026-05-01", "scheduled_at": "2026-06-03T12:30:00Z"},
+                {"period_start": "2026-06-01", "scheduled_at": "2026-07-03T12:30:00Z"},
+                {"period_start": "2026-07-01", "scheduled_at": "2026-08-03T12:30:00Z"},
+                {"period_start": "2026-08-01", "scheduled_at": "2026-09-03T12:30:00Z"}
+              ]
+            }
+          }
+        }
+      ],
+      "reason": "32 scheduled releases, ordered by period_start."
+    },
+    {
+      "name": "a period filter matches only periods within the range",
+      "steps": [
+        {
+          "request": {
+            "path": "/v1/release-calendar",
+            "query": {"series_id": "activity-index", "period_start": "2026-07-15", "period_end": "2026-09-01"}
+          },
+          "expect": {
+            "status": 200,
+            "body": {"data": [{"period_start": "2026-08-01", "period_end": "2026-09-01", "scheduled_at": "2026-09-03T12:30:00Z"}]}
+          }
+        },
+        {
+          "request": {
+            "path": "/v1/release-calendar",
+            "query": {"series_id": "activity-index", "period_start": "2026-07-01", "period_end": "2026-08-15"}
+          },
+          "expect": {
+            "status": 200,
+            "body": {"data": [{"period_start": "2026-07-01", "period_end": "2026-08-01", "scheduled_at": "2026-08-03T12:30:00Z"}]}
+          }
+        }
+      ],
+      "reason": "A release is included only when its whole period lies within the range. Overlap matching would return both the July and the August 2026 releases for each range."
+    },
+    {
+      "name": "the calendar ignores the clock",
+      "clock": "2024-01-01T00:00:00Z",
+      "steps": [
+        {
+          "request": {
+            "path": "/v1/release-calendar",
+            "query": {"series_id": "activity-index", "period_start": "2026-08-01", "period_end": "2026-09-01"}
+          },
+          "expect": {"status": 200, "body": {"data": [{"scheduled_at": "2026-09-03T12:30:00Z"}]}}
+        }
+      ],
+      "reason": "A calendar is a published plan, so every entry is returned even before any revision is available."
+    },
+    {
+      "name": "the calendar is not paged",
+      "steps": [
+        {
+          "request": {"path": "/v1/release-calendar", "query": {"series_id": "activity-index", "page_size": "10"}},
+          "expect": {"status": 400, "code": "unknown_parameter", "body": {"parameter": "page_size"}}
+        }
+      ],
+      "reason": "The calendar returns every matching entry in one response."
+    },
+    {
+      "name": "the calendar needs no entitlement",
+      "steps": [
+        {
+          "request": {
+            "path": "/v1/release-calendar",
+            "query": {"series_id": "activity-index", "period_start": "2026-07-01", "period_end": "2026-08-01"},
+            "credential": "cred_unentitled"
+          },
+          "expect": {
+            "status": 200,
+            "body": {"data": [{"series_id": "activity-index", "period_start": "2026-07-01", "scheduled_at": "2026-08-03T12:30:00Z"}]}
+          }
+        },
+        {
+          "request": {"path": "/v1/release-calendar", "query": {"series_id": "activity-index"}, "credential": null},
+          "expect": {"status": 401, "code": "unauthenticated"}
+        },
+        {"request": {"path": "/v1/release-calendar", "query": {"series_id": "no-such-series"}}, "expect": {"status": 404, "code": "not_found"}}
+      ],
+      "reason": "A release schedule is metadata, like the catalog, so any valid customer key may read it without an entitlement. A key is still required, and an unknown series is still not found."
+    }
+  ]
+}

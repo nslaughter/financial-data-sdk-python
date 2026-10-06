@@ -1,0 +1,37 @@
+{
+  "contract_version": "0.3.0",
+  "case": "out-of-order-arrival",
+  "description": "The November 2025 initial release (100.0) failed the provider's validation and was reprocessed the next day. By then the source's revision (100.2) had already become available. The revision takes precedence even though it arrived first.",
+  "checks": [
+    {
+      "name": "initial release held by the provider",
+      "query": {"series_id": "activity-index", "period_start": "2025-11-01", "period_end": "2025-12-01", "available_as_of": "2025-12-03T12:31:10Z"},
+      "expected": [],
+      "reason": "rev_nov25_1 was published and received on December 3 but not available until December 4 at 12:45:00."
+    },
+    {
+      "name": "revision available before the release it revises",
+      "query": {"series_id": "activity-index", "period_start": "2025-11-01", "period_end": "2025-12-01", "available_as_of": "2025-12-04T12:31:10Z"},
+      "expected": [
+        {"observation_id": "obs_nov25", "revision_id": "rev_nov25_2", "value": "100.2"}
+      ],
+      "reason": "rev_nov25_2 is the only available revision."
+    },
+    {
+      "name": "initial release arrives late",
+      "query": {"series_id": "activity-index", "period_start": "2025-11-01", "period_end": "2025-12-01", "available_as_of": "2025-12-04T12:45:00Z"},
+      "expected": [
+        {"observation_id": "obs_nov25", "revision_id": "rev_nov25_2", "value": "100.2"}
+      ],
+      "reason": "Both revisions are available. rev_nov25_2 has revision_number 2 and supersedes rev_nov25_1, even though rev_nov25_1 arrived later."
+    },
+    {
+      "name": "latest",
+      "query": {"series_id": "activity-index", "period_start": "2025-11-01", "period_end": "2025-12-01", "available_as_of": null},
+      "expected": [
+        {"observation_id": "obs_nov25", "revision_id": "rev_nov25_2", "value": "100.2"}
+      ],
+      "reason": "Precedence follows revision_number, not arrival order."
+    }
+  ]
+}

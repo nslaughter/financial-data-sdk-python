@@ -1,0 +1,61 @@
+{
+  "contract_version": "0.3.0",
+  "case": "august-2026-at-cutoffs",
+  "description": "The August 2026 observation is released as 102.4 on September 3 and revised by the source to 102.1 on September 10. Each cutoff asks which version an entitled customer could retrieve at that instant.",
+  "checks": [
+    {
+      "name": "published and received, not yet available",
+      "query": {"series_id": "activity-index", "period_start": "2026-08-01", "period_end": "2026-09-01", "available_as_of": "2026-09-03T12:30:30Z"},
+      "expected": [],
+      "reason": "The source published at 12:30:00 and the provider received the value at 12:30:04, but it was not available through the API until 12:31:10."
+    },
+    {
+      "name": "initial release available",
+      "query": {"series_id": "activity-index", "period_start": "2026-08-01", "period_end": "2026-09-01", "available_as_of": "2026-09-03T12:32:00Z"},
+      "expected": [
+        {"observation_id": "obs_aug26", "revision_id": "rev_aug26_1", "value": "102.4"}
+      ],
+      "reason": "rev_aug26_1 became available at 12:31:10."
+    },
+    {
+      "name": "research date used in the examples",
+      "query": {"series_id": "activity-index", "period_start": "2026-08-01", "period_end": "2026-09-01", "available_as_of": "2026-09-04T00:00:00Z"},
+      "expected": [
+        {"observation_id": "obs_aug26", "revision_id": "rev_aug26_1", "value": "102.4"}
+      ],
+      "reason": "Research done on September 4 used 102.4. This answer must not change after the revision is loaded."
+    },
+    {
+      "name": "revision published, not yet available",
+      "query": {"series_id": "activity-index", "period_start": "2026-08-01", "period_end": "2026-09-01", "available_as_of": "2026-09-10T12:30:20Z"},
+      "expected": [
+        {"observation_id": "obs_aug26", "revision_id": "rev_aug26_1", "value": "102.4"}
+      ],
+      "reason": "The revision was published at 12:30:00 and received at 12:30:04 but not available until 12:30:40."
+    },
+    {
+      "name": "one second before the revision is available",
+      "query": {"series_id": "activity-index", "period_start": "2026-08-01", "period_end": "2026-09-01", "available_as_of": "2026-09-10T12:30:39Z"},
+      "expected": [
+        {"observation_id": "obs_aug26", "revision_id": "rev_aug26_1", "value": "102.4"}
+      ],
+      "reason": "rev_aug26_2 is not yet available."
+    },
+    {
+      "name": "revision available at the exact instant",
+      "query": {"series_id": "activity-index", "period_start": "2026-08-01", "period_end": "2026-09-01", "available_as_of": "2026-09-10T12:30:40Z"},
+      "expected": [
+        {"observation_id": "obs_aug26", "revision_id": "rev_aug26_2", "value": "102.1"}
+      ],
+      "reason": "The cutoff includes revisions available at that exact instant."
+    },
+    {
+      "name": "latest",
+      "query": {"series_id": "activity-index", "period_start": "2026-08-01", "period_end": "2026-09-01", "available_as_of": null},
+      "expected": [
+        {"observation_id": "obs_aug26", "revision_id": "rev_aug26_2", "value": "102.1"}
+      ],
+      "reason": "Without a cutoff, the query returns the revision with the highest revision_number."
+    }
+  ]
+}

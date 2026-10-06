@@ -1,0 +1,155 @@
+{
+  "contract_version": "0.3.0",
+  "case": "export-handoff",
+  "description": "A customer exports a snapshot at 2026-09-10T12:30:20Z. The export file finishes writing at 12:30:50. The August revision becomes available at 12:30:40, between the two.",
+  "scenarios": [
+    {
+      "name": "the export position matches its snapshot",
+      "clock": "2026-09-10T12:30:20Z",
+      "steps": [
+        {
+          "id": "create",
+          "request": {"method": "POST", "path": "/v1/datasets/core-indicators/exports"},
+          "expect": {
+            "status": 201,
+            "headers": {"Location": "/v1/exports/${create.export_id}"},
+            "body": {
+              "dataset_id": "core-indicators",
+              "position": 36,
+              "created_at": "2026-09-10T12:30:20Z",
+              "expires_at": "2026-09-11T12:30:20Z",
+              "api_version": "v1",
+              "contract_version": "0.3.0",
+              "coverage": {
+                "series_ids": ["activity-index"],
+                "observation_count": 32,
+                "revision_count": 36,
+                "period_start": "2024-01-01",
+                "period_end": "2026-09-01"
+              },
+              "files": [
+                {
+                  "name": "revisions.jsonl",
+                  "url": "/v1/exports/${create.export_id}/files/revisions.jsonl",
+                  "media_type": "application/x-ndjson",
+                  "record_count": 36,
+                  "size_bytes": 13695,
+                  "sha256": "e75e2d61e8ded1e54e210e7d854c394c9e880dcacafd2c6423ddfe5b81652469"
+                }
+              ]
+            }
+          }
+        },
+        {"set_clock": "2026-09-10T12:30:50Z"},
+        {
+          "request": {"path": "/v1/exports/${create.export_id}"},
+          "expect": {
+            "status": 200,
+            "body": {
+              "export_id": "${create.export_id}",
+              "position": 36,
+              "files": [
+                {
+                  "url": "/v1/exports/${create.export_id}/files/revisions.jsonl",
+                  "sha256": "e75e2d61e8ded1e54e210e7d854c394c9e880dcacafd2c6423ddfe5b81652469"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "request": {"path": "${create.files.0.url}"},
+          "expect": {
+            "status": 200,
+            "headers": {"Content-Type": "application/x-ndjson"},
+            "body_sha256": "e75e2d61e8ded1e54e210e7d854c394c9e880dcacafd2c6423ddfe5b81652469",
+            "body_lines": [
+              {"sequence": 1, "revision_id": "rev_jan24_1"},
+              {"sequence": 2, "revision_id": "rev_feb24_1"},
+              {"sequence": 3, "revision_id": "rev_mar24_1"},
+              {"sequence": 4, "revision_id": "rev_apr24_1"},
+              {"sequence": 5, "revision_id": "rev_may24_1"},
+              {"sequence": 6, "revision_id": "rev_jun24_1"},
+              {"sequence": 7, "revision_id": "rev_jul24_1"},
+              {"sequence": 8, "revision_id": "rev_aug24_1"},
+              {"sequence": 9, "revision_id": "rev_sep24_1"},
+              {"sequence": 10, "revision_id": "rev_oct24_1"},
+              {"sequence": 11, "revision_id": "rev_nov24_1"},
+              {"sequence": 12, "revision_id": "rev_dec24_1"},
+              {"sequence": 13, "revision_id": "rev_jan25_1"},
+              {"sequence": 14, "revision_id": "rev_feb25_1"},
+              {"sequence": 15, "revision_id": "rev_mar25_1"},
+              {"sequence": 16, "revision_id": "rev_apr25_1"},
+              {"sequence": 17, "revision_id": "rev_may25_1"},
+              {"sequence": 18, "revision_id": "rev_may25_2"},
+              {"sequence": 19, "revision_id": "rev_jun25_1"},
+              {"sequence": 20, "revision_id": "rev_may25_3"},
+              {"sequence": 21, "revision_id": "rev_jul25_1"},
+              {"sequence": 22, "revision_id": "rev_aug25_1"},
+              {"sequence": 23, "revision_id": "rev_sep25_1"},
+              {"sequence": 24, "revision_id": "rev_oct25_1"},
+              {"sequence": 25, "revision_id": "rev_nov25_2"},
+              {"sequence": 26, "revision_id": "rev_nov25_1"},
+              {"sequence": 27, "revision_id": "rev_dec25_1"},
+              {"sequence": 28, "revision_id": "rev_jan26_1"},
+              {"sequence": 29, "revision_id": "rev_feb26_1"},
+              {"sequence": 30, "revision_id": "rev_feb26_2"},
+              {"sequence": 31, "revision_id": "rev_mar26_1"},
+              {"sequence": 32, "revision_id": "rev_apr26_1"},
+              {"sequence": 33, "revision_id": "rev_may26_1"},
+              {"sequence": 34, "revision_id": "rev_jun26_1"},
+              {"sequence": 35, "revision_id": "rev_jul26_1"},
+              {"sequence": 36, "revision_id": "rev_aug26_1", "value": "102.4"}
+            ]
+          }
+        },
+        {
+          "request": {"path": "/v1/datasets/core-indicators/changes", "query": {"after": "${create.position}"}},
+          "expect": {
+            "status": 200,
+            "body": {
+              "data": [{"sequence": 37, "revision_id": "rev_aug26_2", "change_type": "source_revision", "value": "102.1"}],
+              "next_position": 37,
+              "head_position": 37
+            }
+          }
+        }
+      ],
+      "expected_local_copy": [{"observation_id": "obs_aug26", "revision_id": "rev_aug26_2", "value": "102.1"}],
+      "reason": "The position belongs to the same instant as the snapshot. The file is fetched after the revision became available and still ends at rev_aug26_1; reading the stream after position 36 delivers rev_aug26_2, so the customer applies it."
+    },
+    {
+      "name": "a position taken when the file finishes loses the revision",
+      "clock": "2026-09-10T12:30:20Z",
+      "steps": [
+        {
+          "id": "create",
+          "request": {"method": "POST", "path": "/v1/datasets/core-indicators/exports"},
+          "expect": {"status": 201, "body": {"position": 36}}
+        },
+        {"set_clock": "2026-09-10T12:30:50Z"},
+        {"request": {"path": "/v1/datasets/core-indicators"}, "expect": {"status": 200, "body": {"head_position": 37}}},
+        {
+          "request": {"path": "/v1/datasets/core-indicators/changes", "query": {"after": "37"}},
+          "expect": {"status": 200, "body": {"data": [], "next_position": 37}}
+        }
+      ],
+      "reason": "A customer that loads this file and then starts the stream from the head position when the file finished (37) reads nothing. The revision is absent from the snapshot and never read from the stream, so the local copy stays at rev_aug26_1 (102.4)."
+    },
+    {
+      "name": "an incremental query by period misses the revision",
+      "clock": "2026-09-10T12:30:50Z",
+      "steps": [
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "period_start": "2026-09-01", "period_end": "2026-10-01"}},
+          "expect": {"status": 200, "body": {"data": []}}
+        },
+        {
+          "request": {"path": "/v1/observations", "query": {"series_id": "activity-index", "period_start": "2026-08-01", "period_end": "2026-09-01"}},
+          "expect": {"status": 200, "body": {"data": [{"revision_id": "rev_aug26_2", "value": "102.1"}]}}
+        }
+      ],
+      "reason": "Asking only for periods after the last downloaded period returns nothing, so the revision to August is missed even though every request succeeds."
+    }
+  ]
+}
