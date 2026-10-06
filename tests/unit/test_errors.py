@@ -180,8 +180,14 @@ def test_response_without_a_problem_body_raises_by_status(
         (None, b""),
         (PROBLEM_JSON, None),  # a response a caller's event hook refused
     ]:
-        error = error_for(status, body, content_type)
+        error = error_for(
+            status, body, content_type, retry_after=2.0, request_id="req_1", attempts=3
+        )
         assert type(error) is exception
+        # The headers' values are kept without a problem body, as for a 429
+        # or a 503 from a proxy.
+        assert (error.retry_after, error.request_id) == (2.0, "req_1")
+        assert (error.method, error.path, error.attempts) == ("GET", PATH, 3)
         assert error.status == status
         assert error.code is None
         assert error.title is None
@@ -463,14 +469,15 @@ def test_unexpected_response_names_the_reason_status_and_request() -> None:
         request_id="req_2",
         method="GET",
         path=PATH,
-        attempts=1,
+        attempts=3,
         secret=KEY,
     )
     assert type(error) is UnexpectedResponseError
     assert str(error) == (
         f"200: data[0].available_at is missing (GET {PATH}; request_id req_2)"
     )
-    assert (error.status, error.request_id, error.attempts) == (200, "req_2", 1)
+    assert (error.status, error.request_id) == (200, "req_2")
+    assert (error.method, error.path, error.attempts) == ("GET", PATH, 3)
 
 
 def test_unexpected_response_from_a_pagination_check_has_no_status() -> None:

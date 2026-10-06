@@ -85,13 +85,14 @@ PATH_ARGUMENTS = {
     "series": lambda value: _params.series(value),
     "changes": lambda value: _params.changes(value, 0, None),
 }
+PATH_NAMES = {"dataset": "dataset_id", "series": "series_id", "changes": "dataset_id"}
 
 
 @pytest.mark.parametrize("target", PATH_ARGUMENTS)
 @pytest.mark.parametrize("value", ["", ".", ".."])
 def test_id_that_would_address_another_path_is_refused(target: str, value: str) -> None:
-    refusal = re.escape("must not be empty, '.', or '..'")
-    with pytest.raises(ValueError, match=refusal) as caught:
+    refusal = re.escape(f"{PATH_NAMES[target]} must not be empty, '.', or '..'")
+    with pytest.raises(ValueError, match=f"^{refusal}") as caught:
         PATH_ARGUMENTS[target](value)
     assert caught.value.__context__ is None
 
@@ -99,7 +100,8 @@ def test_id_that_would_address_another_path_is_refused(target: str, value: str) 
 @pytest.mark.parametrize("target", PATH_ARGUMENTS)
 @pytest.mark.parametrize("value", [None, 1, b"activity-index", ["activity-index"]])
 def test_path_id_that_is_not_a_string_is_refused(target: str, value: object) -> None:
-    with pytest.raises(TypeError, match=r"_id must be a str, not "):
+    refusal = f"^{PATH_NAMES[target]} must be a str, not {type(value).__name__}$"
+    with pytest.raises(TypeError, match=refusal):
         PATH_ARGUMENTS[target](value)
 
 
@@ -225,7 +227,8 @@ def test_date_is_written_with_zero_padding(name: str, value: date, text: str) ->
 )
 @pytest.mark.parametrize("name", ["period_start", "period_end"])
 def test_datetime_is_refused_as_a_date(name: str, value: datetime) -> None:
-    with pytest.raises(TypeError, match="must be a date that is not a datetime"):
+    refusal = f"^{name} must be a date that is not a datetime, or a str, not datetime$"
+    with pytest.raises(TypeError, match=refusal):
         observations(**{name: value})
 
 
@@ -445,6 +448,32 @@ def test_query_string_of_the_wrong_type_is_refused(value: object) -> None:
         observations(value)
     with pytest.raises(TypeError, match="page_token must be a str, not "):
         observations(page_token=value)
+
+
+@pytest.mark.parametrize(
+    ("call", "message"),
+    [
+        (
+            lambda: observations(page_size=True),
+            "page_size must be an int that is not a bool, not bool",
+        ),
+        (
+            lambda: observations(period_start=b"2026-08-01"),
+            "period_start must be a date or a str, not bytes",
+        ),
+        (
+            lambda: observations(available_as_of=1.5),
+            "available_as_of must be a timezone-aware datetime or a str, not float",
+        ),
+        (lambda: observations(page_token=["t"]), "page_token must be a str, not list"),
+    ],
+)
+def test_type_error_names_the_argument_and_the_type_given(
+    call: Any, message: str
+) -> None:
+    with pytest.raises(TypeError) as caught:
+        call()
+    assert str(caught.value) == message
 
 
 def test_first_wrong_argument_is_named() -> None:

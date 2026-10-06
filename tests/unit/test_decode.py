@@ -250,27 +250,85 @@ def test_malformed_forms_come_from_the_request_errors_file() -> None:
     assert MALFORMED_DATES == ["2026-02-30", "2026-8-01", "2026-09-01T00:00:00Z"]
 
 
-# Wrong JSON types for each kind of member. null is added for every member
-# that is not nullable.
-WRONG_TYPES: dict[str, list[Any]] = {
-    "string": [1, 1.5, True, [], {}],
-    "strings": ["v1", 1, {}],
-    "integer": ["37", 37.0, 1e2, True, False, [], {}],
-    "boolean": ["true", 1, 0, [], {}],
-    "date": [20260801, True, [], {}],
-    "timestamp": [1_790_000_000, True, [], {}],
-    "decimal": [102.1, 102, True, [], {}],
-    "array": [{}, "data", 1, True],
-    "object": [[], "record", 1, True],
+# Wrong JSON types for each kind of member, with how the refusal names what
+# each kind must be and what each value is. Values hold the key, which the
+# refusal must not repeat. null is added for every member that is not
+# nullable.
+EXPECTED_TYPES = {
+    "string": "a string",
+    "strings": "an array",
+    "integer": "an integer",
+    "boolean": "a boolean",
+    "date": "a string",
+    "timestamp": "a string",
+    "decimal": "a decimal string or null",
+    "array": "an array",
+    "object": "an object",
+}
+NUMBER = "a number"
+STRING = "a string"
+BOOLEAN = "a boolean"
+ARRAY = "an array"
+OBJECT = "an object"
+FRACTION = "a number with a fraction or an exponent"
+WRONG_TYPES: dict[str, list[tuple[Any, str]]] = {
+    "string": [
+        (1, NUMBER),
+        (1.5, NUMBER),
+        (True, BOOLEAN),
+        ([KEY], ARRAY),
+        ({KEY: KEY}, OBJECT),
+    ],
+    "strings": [(KEY, STRING), (1, NUMBER), ({KEY: [KEY]}, OBJECT)],
+    "integer": [
+        ("37", STRING),
+        (KEY, STRING),
+        (37.0, FRACTION),
+        (1e2, FRACTION),
+        (True, BOOLEAN),
+        (False, BOOLEAN),
+        ([KEY], ARRAY),
+        ({KEY: KEY}, OBJECT),
+    ],
+    "boolean": [
+        ("true", STRING),
+        (KEY, STRING),
+        (1, NUMBER),
+        (0, NUMBER),
+        ([KEY], ARRAY),
+        ({KEY: KEY}, OBJECT),
+    ],
+    "date": [(20260801, NUMBER), (True, BOOLEAN), ([KEY], ARRAY), ({KEY: KEY}, OBJECT)],
+    "timestamp": [
+        (1_790_000_000, NUMBER),
+        (True, BOOLEAN),
+        ([KEY], ARRAY),
+        ({KEY: KEY}, OBJECT),
+    ],
+    "decimal": [
+        (102.1, NUMBER),
+        (102, NUMBER),
+        (True, BOOLEAN),
+        ([KEY], ARRAY),
+        ({KEY: KEY}, OBJECT),
+    ],
+    "array": [({KEY: KEY}, OBJECT), (KEY, STRING), (1, NUMBER), (True, BOOLEAN)],
+    "object": [([KEY], ARRAY), (KEY, STRING), (1, NUMBER), (True, BOOLEAN)],
 }
 
 WRONG_TYPE_CASES = [
     pytest.param(
-        endpoint, where, location, value, id=f"{endpoint}:{where}={json.dumps(value)}"
+        endpoint,
+        where,
+        location,
+        value,
+        f"{where} must be {EXPECTED_TYPES[kind]}, not {found}",
+        id=f"{endpoint}:{where}={json.dumps(value)}",
     )
     for endpoint, name, where, location in MEMBERS
-    for value in WRONG_TYPES[KINDS.get(name, "object")]
-    + ([] if nullable(endpoint, name) else [None])
+    for kind in [KINDS.get(name, "object")]
+    for value, found in WRONG_TYPES[kind]
+    + ([] if nullable(endpoint, name) else [(None, "null")])
 ]
 
 
@@ -300,13 +358,15 @@ def test_missing_member_is_refused_and_named(
     assert message == f"{where} is missing"
 
 
-@pytest.mark.parametrize(("endpoint", "where", "location", "value"), WRONG_TYPE_CASES)
+@pytest.mark.parametrize(
+    ("endpoint", "where", "location", "value", "expected"), WRONG_TYPE_CASES
+)
 def test_wrong_json_type_is_refused_and_named(
-    endpoint: str, where: str, location: Location, value: Any
+    endpoint: str, where: str, location: Location, value: Any, expected: str
 ) -> None:
     decode, build = ENDPOINTS[endpoint]
     message = refused(decode, changed(build(), location, value))
-    assert message.startswith(f"{where} must be ")
+    assert message == expected
 
 
 @pytest.mark.parametrize(
@@ -605,6 +665,7 @@ def test_malformed_date_is_refused(member: str, text: str) -> None:
         "2026-01-32",
         "2026-04-31",
         "0000-01-01",  # before the first year a date can hold
+        "999-01-01",
         "20260101",
         "2026-01-01\n",
         " 2026-01-01",
@@ -668,6 +729,7 @@ def test_malformed_timestamp_is_refused(
         "2026-09-10T12:30:40",
         "2025-02-29T00:00:00Z",
         "0000-01-01T00:00:00Z",
+        "999-01-01T00:00:00Z",
     ],
 )
 def test_impossible_or_malformed_timestamp_is_refused(text: str) -> None:
