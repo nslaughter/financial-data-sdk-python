@@ -19,6 +19,7 @@ from ._config import (
     resolve_api_key,
     resolve_base_url,
 )
+from ._errors import redact
 from ._records import ChangePage, Dataset, Meta, ObservationPage, Revision, Series
 
 
@@ -109,7 +110,11 @@ class Client:
         return derived
 
     def __repr__(self) -> str:
-        return f"Client(base_url={self._base_url!r})"
+        # The base URL can hold the key, as a gateway's path prefix might. The
+        # key can also span the URL and the text around it, so the whole is
+        # redacted too, as an exception's message is.
+        base_url = redact(self._base_url, self._api_key)
+        return redact(f"Client(base_url={base_url!r})", self._api_key)
 
     def meta(self) -> Meta:
         """Describe the server: its API versions, contract version, and clock."""

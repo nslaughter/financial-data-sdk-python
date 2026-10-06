@@ -470,3 +470,28 @@ def test_repr_shows_the_base_url_and_not_the_key() -> None:
     assert repr(client) == "Client(base_url='https://api.example.com/gateway')"
     assert repr(client.with_options(timeout=None)) == repr(client)
     assert KEY not in repr(client)
+
+
+def test_repr_redacts_a_key_in_the_base_url() -> None:
+    base_url = f"https://{KEY}.example.com/gateway/{KEY}"
+    client = Client(api_key=KEY, base_url=base_url)
+    shown = "Client(base_url='https://[redacted].example.com/gateway/[redacted]')"
+    assert repr(client) == shown
+    assert repr(client.with_options(timeout=None)) == shown
+    # Requests still go to the base URL as configured.
+    assert client._base_url == base_url
+    assert client.with_options()._base_url == base_url
+
+
+def test_repr_redacts_a_key_in_the_base_url_before_escaping_it() -> None:
+    # repr doubles the backslash, which would show the key escaped.
+    key = "sk\\9Qz"
+    client = Client(api_key=key, base_url=f"https://api.example.com/{key}")
+    assert repr(client) == "Client(base_url='https://api.example.com/[redacted]')"
+
+
+def test_repr_redacts_a_key_spanning_the_base_url_and_the_text_before_it() -> None:
+    key = "url='https"
+    client = Client(api_key=key, base_url="https://api.example.com")
+    assert repr(client) == "Client(base_[redacted]://api.example.com')"
+    assert repr(client.with_options(timeout=None)) == repr(client)

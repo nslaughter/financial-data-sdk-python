@@ -22,6 +22,27 @@ REDACTED: Final = "[redacted]"
 class FinancialDataError(Exception):
     """Base class of every exception the SDK raises."""
 
+    def __reduce__(self) -> tuple[Any, ...]:
+        # pickle and copy would call the class with `args`, the message
+        # alone, which an `__init__` with required keyword arguments refuses.
+        # A process pool pickles the exception a worker raises, so make it
+        # from `args` without `__init__`, then restore its attributes.
+        return (_rebuild, (type(self), self.args), dict(vars(self)))
+
+
+def _rebuild(
+    cls: type[FinancialDataError], args: tuple[Any, ...]
+) -> FinancialDataError:
+    """Make an exception with these `args` without calling its `__init__`.
+
+    `args` is set after `__new__`, because `OSError.__new__`, which
+    `DeadlineExceededError` inherits through `TimeoutError`, leaves `args`
+    empty for a subclass with its own `__init__`.
+    """
+    error = cls.__new__(cls)
+    error.args = args
+    return error
+
 
 class ConfigError(FinancialDataError, ValueError):
     """An argument of `Client`, `with_options`, or `RetryPolicy` is invalid.
@@ -93,6 +114,17 @@ class APIError(FinancialDataError):
         self.method = method
         self.path = path
         self.attempts = attempts
+
+    def __reduce__(self) -> tuple[Any, ...]:
+        rebuild, args, state = super().__reduce__()
+        if self.problem is not None:  # a mapping proxy cannot be pickled
+            state["problem"] = dict(self.problem)
+        return (rebuild, args, state)
+
+    def __setstate__(self, state: dict[str, Any] | None, /) -> None:
+        if state is not None and state.get("problem") is not None:
+            state = {**state, "problem": MappingProxyType(dict(state["problem"]))}
+        super().__setstate__(state)
 
 
 class InvalidRequestError(APIError):
@@ -354,11 +386,15 @@ def api_error(
     `request_id` is the `Request-Id` header, and `path` is the request's
     path with its query string, with each argument that holds the key
     already redacted. `secret` is the key, which is replaced with
-    `[redacted]` in the problem body and the request ID.
+    `[redacted]` in the problem body and the request ID. The exception is
+    chosen from the response's own `code`, so a key inside a code, such as
+    `token` in `page_token_expired`, does not change it.
     """
     if not 400 <= status <= 599:
         raise ValueError(f"status {status} is not an error status")
     problem = _problem(content_type, body)
+    # Chosen before redaction, so the key cannot change which exception it is.
+    exception_class = _exception_class(status, _text_member(problem, "code"))
     if problem is not None:
         problem = _redact_json(problem, secret)
     code = _text_member(problem, "code")
@@ -372,7 +408,7 @@ def api_error(
     text = _phrase(status) if problem is None else detail or title
     if text:
         head = f"{head}: {text}"
-    return _exception_class(status, code)(
+    return exception_class(
         _message(head, method, path, request_id, secret),
         status=status,
         method=method,
