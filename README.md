@@ -10,11 +10,16 @@ design the client interfaces, examples, and release processes their customers
 depend on. This project will make that approach inspectable through a small
 research workflow.
 
-**Status:** Project brief. This repository currently contains this README.
-The SDK, tests, and runnable examples are planned; nothing described here has
-been implemented or tested yet. The demo API and the shared data contract live
-in [financial-data-api](https://github.com/nslaughter/financial-data-api). The dataset is synthetic, and this is a
-demonstration project, not client work.
+**Status:** Specification approved. This repository contains this
+README and the SDK's specification: the [client contract](spec/client.md),
+the [conformance scenarios](spec/conformance.md), the
+[implementation plan](docs/implementation-plan.md), and the rules for
+implementation agents in [`AGENTS.md`](AGENTS.md). The contract's nine
+design decisions are settled as owner specifications. None of the SDK has
+been implemented or tested yet. The demo API and the shared data contract
+live in [financial-data-api](https://github.com/nslaughter/financial-data-api).
+The dataset is synthetic, and this is a demonstration project, not client
+work.
 
 ## What this project demonstrates
 
@@ -74,14 +79,18 @@ belong in the SDK's design and examples.
 4. Follow subsequent releases, revisions, and withdrawals through an update
    cursor while retaining the versions needed to reproduce the earlier
    analysis.
-5. Revoke the credential's access to the series, force throttling beyond the
-   retry budget, and introduce a revision during a download.
+5. Revoke the credential's access to the dataset, force throttling beyond the
+   retry budget through a fault proxy in front of the API, and introduce a
+   revision during a download.
 
-The intended query interface looks like this. It is a sketch; no package has
-been published.
+The query interface looks like this. The
+[client contract](spec/client.md#public-interface) specifies it; no package
+has been published yet.
 
 ```python
 import os
+
+from financial_data import Client
 
 with Client(api_key=os.environ["FINANCIAL_DATA_API_KEY"]) as client:
     observations = client.observations.iterate(
@@ -112,12 +121,15 @@ which version the provider could deliver by the cutoff, so the query returns
   change them. An expired snapshot is reported as requiring a restart.
 - **Retries are bounded and safe to repeat.** The client uses a finite attempt
   limit, a total retry budget, backoff with jitter, and `Retry-After` in both
-  its date and delay forms. The caller's deadline covers requests and retry
-  waits. Only reads that are safe to repeat are retried.
+  its date and delay forms. The caller's deadline covers retry waits and
+  bounds each wait on the network; the
+  [client contract](spec/client.md#deadline) says how far a slow response
+  can run past it. Only reads that are safe to repeat are retried.
 - **Errors are traceable and omit secrets.** Errors include the provider's
-  request ID. Neither errors nor logs contain the credential.
+  request ID, which the demo API adds to its responses in contract version
+  0.4.0. Neither the SDK's errors nor its logs contain the credential.
 - **The client fits the application around it.** Customers can supply their
-  own transport for connection requirements or test fixtures. Logging uses the
+  own `httpx.Client` for connection requirements or test fixtures. Logging uses the
   standard library without installing global handlers. Dataframe support is an
   optional dependency, and any conversion that drops revision information is
   left to the customer's analysis.
@@ -147,20 +159,30 @@ workflow in their own repositories.
 ## What the repository will contain
 
 - A customer-focused README and quickstart.
-- A runnable research example or notebook, and a scheduled-job example that
-  checkpoints and resumes.
+- A runnable research example, and a scheduled-job example that keeps a local
+  copy in SQLite, checkpoints, and resumes.
+- The SDK's interface and behavior, specified in
+  [`spec/client.md`](spec/client.md).
+- Scenarios with the results a correct SDK produces, including throttling and
+  transient failures from a local fault proxy, specified in
+  [`spec/conformance.md`](spec/conformance.md) before any SDK code.
+- An [implementation plan](docs/implementation-plan.md) of one pull request
+  at a time, and rules for implementation agents in [`AGENTS.md`](AGENTS.md).
 - Type documentation mapped to the shared data contract.
 - CI that builds the distribution, installs it, and runs the examples and the
   contract's checks against the pinned demo API image on each supported Python
-  version.
-- A tagged release with an installable distribution.
+  version, from 3.11 on.
+- A tagged GitHub release with the wheel and the source distribution attached.
 - Documented limitations and a clear demonstration label.
 
 ## A later contract change will test the maintenance work
 
-The fourth stage adds a deliberate change to this SDK and the API: replacing
-an ambiguous `date` field with explicit publication, observation period, and
-availability fields. The SDK will gain tagged old and new releases, an
+The fourth stage makes a deliberate breaking change to the API's data model
+and to this SDK. API v1 already uses explicit `published_at`, `period_start`,
+`period_end`, and `available_at` fields, so the change will be a different
+one; choosing it is an
+[open question](https://github.com/nslaughter/financial-data-api/blob/main/spec/data-contract.md#open-questions)
+in the data contract. The SDK will gain tagged old and new releases, an
 explicit mode for the old API behavior, a compatibility matrix with CI
 results, migration examples that include data the customer has already stored,
 release notes, and support and deprecation guidance. Unsupported SDK and API
