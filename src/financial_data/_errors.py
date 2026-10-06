@@ -1,14 +1,22 @@
-"""The exceptions the SDK raises.
+"""The exceptions the SDK raises, and choosing one for a response.
 
 Every exception's `args` is its message alone, so the attributes are the
-only other place an exception holds anything.
+only other place an exception holds anything. Choosing an exception for a
+response is pure: it takes the response's status, the headers it needs, and
+its body, and replaces the key with `[redacted]` in any text taken from the
+response before an exception holds it.
 """
 
 from __future__ import annotations
 
 from collections.abc import Mapping
+from http import HTTPStatus
 from types import MappingProxyType
-from typing import Any
+from typing import Any, Final
+
+from ._decode import json_object, media_type
+
+REDACTED: Final = "[redacted]"
 
 
 class FinancialDataError(Exception):
@@ -207,3 +215,182 @@ class UnexpectedResponseError(FinancialDataError):
         self.method = method
         self.path = path
         self.attempts = attempts
+
+
+# Choosing an exception for a response
+
+_BY_CODE: Final[dict[tuple[int, str], type[APIError]]] = {
+    (400, "unknown_parameter"): InvalidRequestError,
+    (400, "missing_parameter"): InvalidRequestError,
+    (400, "invalid_parameter"): InvalidRequestError,
+    (400, "conflicting_cutoffs"): InvalidRequestError,
+    (400, "cutoff_in_future"): InvalidRequestError,
+    (400, "invalid_page_token"): PageTokenError,
+    (400, "page_token_mismatch"): PageTokenError,
+    (410, "page_token_expired"): PageTokenExpiredError,
+    (400, "position_ahead"): PositionAheadError,
+    (410, "position_expired"): PositionExpiredError,
+    (403, "not_entitled"): NotEntitledError,
+    (404, "not_found"): NotFoundError,
+    (404, "unsupported_api_version"): UnsupportedAPIVersionError,
+}
+
+
+def redact(text: str, secret: str) -> str:
+    """Replace every occurrence of the key in text with `[redacted]`."""
+    return text.replace(secret, REDACTED)
+
+
+def _redact_json(document: dict[str, Any], secret: str) -> dict[str, Any]:
+    """Copy a JSON object with the key replaced in every string, at any depth.
+
+    Member names are strings too. The copy walks the document with a stack
+    instead of recursion, so a body nested as deeply as the JSON parser
+    accepts cannot exhaust Python's.
+    """
+    root: dict[str, Any] = {}
+    pending: list[tuple[Any, Any]] = [(document, root)]
+
+    def copy(value: Any) -> Any:
+        if isinstance(value, dict | list):
+            container = type(value)()
+            pending.append((value, container))
+            return container
+        return redact(value, secret) if isinstance(value, str) else value
+
+    while pending:
+        source, target = pending.pop()
+        if isinstance(source, dict):
+            for name, value in source.items():
+                target[redact(name, secret)] = copy(value)
+        else:
+            target.extend(copy(value) for value in source)
+    return root
+
+
+def _problem(content_type: str | None, body: bytes | None) -> dict[str, Any] | None:
+    """Return a problem response's body, or `None` if it is not one.
+
+    A problem response's `Content-Type` is `application/problem+json`,
+    ignoring parameters, and its body is a JSON object.
+    """
+    if body is None or media_type(content_type) != "application/problem+json":
+        return None
+    return json_object(body)
+
+
+def _text_member(problem: Mapping[str, Any] | None, name: str) -> str | None:
+    """Return a problem member that is a string, or `None`."""
+    value = None if problem is None else problem.get(name)
+    return value if isinstance(value, str) else None
+
+
+def _exception_class(status: int, code: str | None) -> type[APIError]:
+    """Choose by the code and the status together, then by the status alone."""
+    chosen = None if code is None else _BY_CODE.get((status, code))
+    if chosen is not None:
+        return chosen
+    if status == 401:
+        return AuthenticationError
+    if status == 429:
+        return RateLimitError
+    if status >= 500:
+        return ServerError
+    return APIError
+
+
+def _phrase(status: int) -> str | None:
+    """Return the standard reason phrase of a status, or `None` for none."""
+    try:
+        return HTTPStatus(status).phrase
+    except ValueError:  # a status HTTP does not name, such as 499
+        return None
+
+
+def _request(method: str, path: str, request_id: str | None) -> str:
+    if request_id is None:
+        return f"({method} {path})"
+    return f"({method} {path}; request_id {request_id})"
+
+
+def api_error(
+    *,
+    status: int,
+    content_type: str | None,
+    body: bytes | None,
+    retry_after: float | None,
+    request_id: str | None,
+    method: str,
+    path: str,
+    attempts: int,
+    secret: str,
+) -> APIError:
+    """Return the exception for a `4xx` or `5xx` response.
+
+    `body` is `None` when the SDK read no body, as for a response a caller's
+    event hook refused, which is then handled as one without a problem body.
+    `retry_after` is the wait `Retry-After` asked for, already read.
+    `request_id` is the `Request-Id` header, and `path` is the request's
+    path with its query string, with each argument that holds the key
+    already redacted. `secret` is the key, which is replaced with
+    `[redacted]` in the problem body and the request ID.
+    """
+    if not 400 <= status <= 599:
+        raise ValueError(f"status {status} is not an error status")
+    problem = _problem(content_type, body)
+    if problem is not None:
+        problem = _redact_json(problem, secret)
+    code = _text_member(problem, "code")
+    title = _text_member(problem, "title")
+    detail = _text_member(problem, "detail")
+    if request_id is not None:
+        request_id = redact(request_id, secret)
+    head = str(status) if code is None else f"{status} {code}"
+    # Without a problem body, name what the status means rather than quote
+    # the reason phrase, which anything in front of the API may have written.
+    text = _phrase(status) if problem is None else detail or title
+    if text:
+        head = f"{head}: {text}"
+    return _exception_class(status, code)(
+        f"{head} {_request(method, path, request_id)}",
+        status=status,
+        method=method,
+        path=path,
+        attempts=attempts,
+        code=code,
+        title=title,
+        detail=detail,
+        parameter=_text_member(problem, "parameter"),
+        problem=problem,
+        retry_after=retry_after,
+        request_id=request_id,
+    )
+
+
+def unexpected_response(
+    reason: str,
+    *,
+    status: int | None,
+    request_id: str | None,
+    method: str,
+    path: str,
+    attempts: int,
+    secret: str,
+) -> UnexpectedResponseError:
+    """Return the exception for a response the API's documents do not allow.
+
+    `reason` is the SDK's own text, such as an `InvalidResponse`'s message,
+    and `status` is `None` for a page that breaks a pagination guarantee.
+    `request_id` and `path` are as for `api_error`.
+    """
+    if request_id is not None:
+        request_id = redact(request_id, secret)
+    head = reason if status is None else f"{status}: {reason}"
+    return UnexpectedResponseError(
+        f"{head} {_request(method, path, request_id)}",
+        status=status,
+        method=method,
+        path=path,
+        attempts=attempts,
+        request_id=request_id,
+    )
