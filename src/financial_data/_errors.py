@@ -240,11 +240,11 @@ def redact(text: str, secret: str) -> str:
     """Replace every occurrence of the key in text with `[redacted]`.
 
     A key with `[` or `]` in it can form again where `[redacted]` meets the
-    text beside it, as the key `x[` does in `xx[`. A key with `\\` in it can
-    be in the text's `repr` though not in the text, as the key `a\\tb` is
-    when a response's JSON held it unescaped and `\\t` decoded to a tab.
-    Keeping the key out comes before keeping the text exact, so such text is
-    replaced whole.
+    text beside it, as the key `x[` does in `xx[`. A key can also be in the
+    text's `repr` though not in the text: the key `a\\tb` is when a
+    response's JSON held it unescaped and `\\t` decoded to a tab, and a key
+    with a quote can join the quotes `repr` adds. Keeping the key out comes
+    before keeping the text exact, so such text is replaced whole.
     """
     redacted = text.replace(secret, REDACTED)
     if secret in redacted or secret in repr(redacted):
