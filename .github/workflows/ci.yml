@@ -53,6 +53,11 @@ jobs:
           assert (path.parent / "py.typed").is_file()
           version = importlib.metadata.version("financial-data-sdk")
           assert financial_data.__version__ == version
+          metadata = importlib.metadata.metadata("financial-data-sdk")
+          license = metadata.get("License-Expression")
+          assert license == "LicenseRef-NSPUL-1.0", license
+          files = importlib.metadata.files("financial-data-sdk") or []
+          assert any(f.as_posix().endswith("/licenses/LICENSE") for f in files)
           print(f"financial_data {version} imported from {path}")
           EOF
 
