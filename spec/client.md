@@ -1,10 +1,10 @@
 # Client contract: financial data SDK for Python
 
-**Status:** Draft 0.1.0, for the operator's review; not tagged. Its nine
+**Status:** Version 0.1.0, approved by the operator on 2026-10-06. Its nine
 design decisions, D1 to D9, are [owner specifications](#owner-specifications):
 the operator decided each on 2026-10-05, and an implementation follows them
-as written. The other [decisions](#decisions) are proposed by this draft and
-take effect when the operator approves it. None of the SDK exists yet.
+as written. The operator approved the other [decisions](#decisions) with
+this version. None of the SDK exists yet.
 
 This document governs the SDK's code: its public interface, the records it
 returns, pagination and resuming, errors, retries and deadlines, credentials
@@ -874,8 +874,8 @@ with `base_delay` at most `max_delay`. Otherwise the constructor raises
 
 ## Decisions
 
-These are proposed by this draft and take effect when the operator approves
-it. Each can be revisited in a later version.
+The operator approved these on 2026-10-06, with version 0.1.0. Each can be
+revisited in a later version.
 
 1. **The client is synchronous only.** The README chooses this: the caller
    controls concurrency. An asynchronous client would double the surface

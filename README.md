@@ -10,7 +10,7 @@ design the client interfaces, examples, and release processes their customers
 depend on. This project will make that approach inspectable through a small
 research workflow.
 
-**Status:** Specification drafted for review. This repository contains this
+**Status:** Specification approved. This repository contains this
 README and the SDK's specification: the [client contract](spec/client.md),
 the [conformance scenarios](spec/conformance.md), the
 [implementation plan](docs/implementation-plan.md), and the rules for

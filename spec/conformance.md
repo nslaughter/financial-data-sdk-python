@@ -1,8 +1,8 @@
 # Conformance: financial data SDK for Python
 
-**Status:** Draft 0.1.0, for the operator's review, with the
-[client contract](client.md); not tagged. Scenarios that rest on one of the
-contract's owner specifications name it.
+**Status:** Version 0.1.0, approved by the operator on 2026-10-06 with the
+[client contract](client.md). Scenarios that rest on one of the contract's
+owner specifications name it.
 
 The SDK passes two kinds of checks:
 
@@ -849,8 +849,7 @@ cutoff up to its last sync.
 
 ## Decisions
 
-These are proposed with this draft and take effect when the operator
-approves it.
+The operator approved these on 2026-10-06, with version 0.1.0.
 
 1. **The SDK scenarios are prose matched to tests by name, not a notation
    the harness parses.** There are 33, each a few calls against a real

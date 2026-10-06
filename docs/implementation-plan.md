@@ -4,7 +4,7 @@ This plan divides the SDK's implementation into pull requests that can be
 reviewed one at a time. Each names what it builds, what it leaves out, and
 the checks that prove it done. The specifications are
 [`spec/client.md`](../spec/client.md) and
-[`spec/conformance.md`](../spec/conformance.md), at draft 0.1.0, built on
+[`spec/conformance.md`](../spec/conformance.md), at version 0.1.0, built on
 the API's contract version 0.3.0. Read [`AGENTS.md`](../AGENTS.md) before
 starting any of them.
 
