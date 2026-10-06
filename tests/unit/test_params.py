@@ -199,6 +199,72 @@ def test_string_subclass_is_sent_as_its_text_not_as_it_shows() -> None:
     assert _params.series(Shown("activity-index")).path == "/v1/series/activity-index"
 
 
+# The path with the query string
+
+
+def test_path_with_query_without_a_query() -> None:
+    assert _params.meta().path_with_query == "/v1/meta"
+    assert _params.series("a/b").path_with_query == "/v1/series/a%2Fb"
+
+
+def test_path_with_query_encodes_names_and_values_as_path_segments() -> None:
+    target = observations(
+        "activity index",
+        period_start="2026-08-01",
+        available_as_of="2026-09-04T00:00:00Z",
+        page_size=10,
+        page_token="a+b/c=d&e",
+    )
+    assert target.path_with_query == (
+        "/v1/observations?series_id=activity%20index&period_start=2026-08-01"
+        "&available_as_of=2026-09-04T00%3A00%3A00Z&page_size=10"
+        "&page_token=a%2Bb%2Fc%3Dd%26e"
+    )
+    changes = _params.changes("core-indicators", 16, 2)
+    assert (
+        changes.path_with_query
+        == "/v1/datasets/core-indicators/changes?after=16&limit=2"
+    )
+
+
+def test_path_with_query_keeps_an_empty_value() -> None:
+    assert observations("").path_with_query == "/v1/observations?series_id="
+
+
+def test_query_value_with_a_lone_surrogate_is_sent_as_its_code_unit() -> None:
+    target = observations("activity-index", page_token="a\ud800")
+    assert target.path_with_query.endswith("&page_token=a%ED%A0%80")
+
+
+def test_reported_path_without_the_key_is_the_path_as_sent() -> None:
+    target = observations("activity-index", page_token="token/=")
+    assert target.reported(KEY) == target.path_with_query
+
+
+@pytest.mark.parametrize(
+    "key", [KEY, "key/with=slash", "k%2F", "key+plus&amp", "a\\b", 'x"y']
+)
+def test_reported_path_redacts_each_segment_and_value_holding_the_key(
+    key: str,
+) -> None:
+    assert _params.series(key).reported(key) == "/v1/series/[redacted]"
+    assert _params.series(f"my-{key}-id").reported(key) == "/v1/series/[redacted]"
+    changes = _params.changes(f"{key}!", 1, 2)
+    assert changes.reported(key) == "/v1/datasets/[redacted]/changes?after=1&limit=2"
+    target = observations(key, page_size=5, page_token=f"{key}{key}")
+    assert target.reported(key) == (
+        "/v1/observations?series_id=[redacted]&page_size=5&page_token=[redacted]"
+    )
+
+
+def test_reported_path_redacts_a_key_that_spans_two_parts() -> None:
+    # The key is in no argument, but forms across the SDK's own text.
+    assert _params.series("activity").reported("series/activity") == "/v1/[redacted]"
+    assert (
+        observations("abc").reported("id=abc") == "/v1/observations?series_[redacted]"
+    )
+
+
 # Dates
 
 
