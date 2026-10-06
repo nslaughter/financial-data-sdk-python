@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import traceback
+from collections.abc import Mapping
 from typing import Any
 
 import pytest
@@ -321,14 +322,34 @@ def test_str_without_a_problem_body_names_what_the_status_means(
 # The key in a response
 
 
+def strings_in(value: object) -> list[str]:
+    """Every string in an attribute, at any depth, member names included."""
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, Mapping):
+        return [
+            text
+            for name, item in value.items()
+            for text in [*strings_in(name), *strings_in(item)]
+        ]
+    if isinstance(value, list | tuple):
+        return [text for item in value for text in strings_in(item)]
+    return []
+
+
 def assert_without_key(error: BaseException, key: str = KEY) -> None:
-    """The key is in no rendering of the exception and none of its attributes."""
+    """The key is in no rendering of the exception and none of its attributes.
+
+    A string's repr doubles a backslash, so the strings themselves are
+    searched too.
+    """
     texts = [
         str(error),
         repr(error),
         repr(error.args),
         "".join(traceback.format_exception(error)),
         *(repr(value) for value in vars(error).values()),
+        *(text for value in vars(error).values() for text in strings_in(value)),
     ]
     for text in texts:
         assert key not in text
@@ -461,7 +482,7 @@ def test_key_spanning_the_request_id_and_the_text_after_it_is_redacted() -> None
     assert_without_key(error, key)
 
 
-def test_key_spanning_the_status_and_the_reason_is_redacted() -> None:
+def test_key_spanning_the_status_and_the_colon_after_it_is_redacted() -> None:
     key = "302:"
     error = unexpected_response(
         "a 302 response",
