@@ -1,0 +1,83 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Check, test, and build (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # Every supported version, from 3.11 to the newest stable release.
+        python: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install the development environment
+        run: uv sync --locked --all-extras
+      - name: Check formatting
+        run: uv run ruff format --check .
+      - name: Lint
+        run: uv run ruff check .
+      - name: Type-check
+        run: uv run mypy
+      - name: Run the unit tests
+        run: uv run pytest
+      - name: Build the wheel and the source distribution
+        run: uv build
+      - name: Install the wheel in a clean environment and import it
+        run: |
+          clean="$RUNNER_TEMP/clean"
+          uv venv --python "${{ matrix.python }}" "$clean"
+          uv pip install --python "$clean/bin/python" dist/*.whl
+          # Import from outside the source tree, so only the wheel can answer.
+          cd "$RUNNER_TEMP"
+          "$clean/bin/python" - <<'EOF'
+          import importlib.metadata
+          import pathlib
+          import sys
+
+          import financial_data
+
+          path = pathlib.Path(financial_data.__file__).resolve()
+          assert pathlib.Path(sys.prefix).resolve() in path.parents, path
+          assert (path.parent / "py.typed").is_file()
+          version = importlib.metadata.version("financial-data-sdk")
+          assert financial_data.__version__ == version
+          print(f"financial_data {version} imported from {path}")
+          EOF
+
+  lowest-httpx:
+    name: Unit tests with the lowest httpx
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: "3.11"
+      - name: Install the development environment
+        run: uv sync --locked --all-extras
+      - name: Install the lowest httpx the range allows
+        run: uv pip install "httpx==0.27.0"
+      - name: Run the unit tests
+        run: |
+          uv run --no-sync python -c "import httpx; assert httpx.__version__ == '0.27.0'"
+          uv run --no-sync pytest
+
+  contract:
+    name: Check the vendored contract
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+      - name: Compare contract/ with its tag
+        run: uv run python scripts/check_contract.py
