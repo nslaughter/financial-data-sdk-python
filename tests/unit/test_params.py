@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from datetime import UTC, date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta, timezone, tzinfo
 from enum import IntEnum, StrEnum
 from typing import Any
 
@@ -181,6 +181,22 @@ def test_string_subclass_is_sent_as_its_text() -> None:
     assert type(segment) is str
 
 
+class Shown(str):
+    """A str that shows something other than its text."""
+
+    def __str__(self) -> str:
+        return "shown"
+
+
+def test_string_subclass_is_sent_as_its_text_not_as_it_shows() -> None:
+    target = observations(Shown("activity-index"), period_start=Shown("2026-08-01"))
+    assert target.query == (
+        ("series_id", "activity-index"),
+        ("period_start", "2026-08-01"),
+    )
+    assert _params.series(Shown("activity-index")).path == "/v1/series/activity-index"
+
+
 # Dates
 
 
@@ -291,9 +307,47 @@ def test_instant_outside_the_years_datetime_holds_is_written(
     assert query_value(target, "available_as_of") == text
 
 
-def test_naive_datetime_is_refused() -> None:
+class EasternFall(tzinfo):
+    """US Eastern time on 2026-11-01, when 01:00 to 02:00 happens twice."""
+
+    def utcoffset(self, value: datetime | None) -> timedelta:
+        return timedelta(hours=-5 if value is not None and value.fold else -4)
+
+    def dst(self, value: datetime | None) -> None:
+        return None
+
+    def tzname(self, value: datetime | None) -> None:
+        return None
+
+
+@pytest.mark.parametrize(("fold", "text"), [(0, "05:30:00Z"), (1, "06:30:00Z")])
+def test_repeated_local_time_is_converted_by_its_fold(fold: int, text: str) -> None:
+    value = datetime(2026, 11, 1, 1, 30, tzinfo=EasternFall(), fold=fold)
+    target = observations(available_as_of=value)
+    assert query_value(target, "available_as_of") == f"2026-11-01T{text}"
+
+
+class Unknown(tzinfo):
+    """A time zone that does not know its offset, which makes a datetime naive."""
+
+    def utcoffset(self, value: datetime | None) -> None:
+        return None
+
+    def dst(self, value: datetime | None) -> None:
+        return None
+
+    def tzname(self, value: datetime | None) -> None:
+        return None
+
+
+@pytest.mark.parametrize(
+    "value",
+    [datetime(2026, 9, 4), datetime(2026, 9, 4, tzinfo=Unknown())],
+    ids=["no-tzinfo", "tzinfo-without-offset"],
+)
+def test_naive_datetime_is_refused(value: datetime) -> None:
     with pytest.raises(ValueError, match="available_as_of must be timezone-aware"):
-        observations(available_as_of=datetime(2026, 9, 4))
+        observations(available_as_of=value)
 
 
 @pytest.mark.parametrize(
@@ -329,6 +383,49 @@ def test_integer_is_written_in_decimal_digits(value: int, text: str) -> None:
     assert query_value(observations(page_size=value), "page_size") == text
     changes = _params.changes("core-indicators", value, value)
     assert changes.query == (("after", text), ("limit", text))
+
+
+class Shows(int):
+    """An int that converts and shows itself as something other than its value."""
+
+    def __int__(self) -> int:
+        return 5
+
+    def __index__(self) -> int:
+        return 6
+
+    def __abs__(self) -> int:
+        return 7
+
+    def __repr__(self) -> str:
+        return "repr"
+
+    def __str__(self) -> str:
+        return "str"
+
+    def __format__(self, spec: str) -> str:
+        return "format"
+
+
+@pytest.mark.parametrize(("value", "text"), [(10, "10"), (-10, "-10")])
+def test_integer_subclass_is_written_as_its_value(value: int, text: str) -> None:
+    assert query_value(observations(page_size=Shows(value)), "page_size") == text
+
+
+@pytest.mark.parametrize(
+    ("value", "text"),
+    [
+        (10**5000, "1" + "0" * 5000),
+        (-(10**4500) + 1, "-" + "9" * 4500),
+        (10**1200 + 7, "1" + "0" * 1199 + "7"),
+        (10**600, "1" + "0" * 600),
+        (10**600 - 1, "9" * 600),
+    ],
+    ids=["5001-digits", "negative-4500-digits", "zero-part", "one-part", "no-part"],
+)
+def test_integer_longer_than_str_allows_is_written(value: int, text: str) -> None:
+    # str() refuses more than 4300 digits by default; the API judges the size.
+    assert query_value(observations(page_size=value), "page_size") == text
 
 
 @pytest.mark.parametrize("value", [True, False, "10", 10.0, b"10", [10]])

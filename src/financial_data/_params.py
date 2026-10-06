@@ -20,6 +20,9 @@ from urllib.parse import quote
 
 _MICROSECOND: Final = timedelta(microseconds=1)
 _LAST_ORDINAL: Final = date.max.toordinal()
+# Fewer digits than the least limit `sys.set_int_max_str_digits()` accepts.
+_PART_DIGITS: Final = 600
+_PART: Final = 10**_PART_DIGITS
 
 
 @dataclass(frozen=True, slots=True)
@@ -145,7 +148,24 @@ def integer_text(name: str, value: object) -> str:
     # bool is a subclass of int, so it is refused first.
     if isinstance(value, bool) or not isinstance(value, int):
         raise _type_error(name, "an int that is not a bool", value)
-    return str(int(value))
+    # The value itself, as for a str, not what a subclass's __int__ returns.
+    return _decimal(int.__int__(value))
+
+
+def _decimal(value: int) -> str:
+    """Write an `int` in decimal digits, `-` if negative, however long.
+
+    `str()` refuses an `int` longer than `sys.get_int_max_str_digits()`, 4300
+    digits by default, but a page size out of range is the API's to judge,
+    so a long one is written in parts short enough for any limit.
+    """
+    magnitude = abs(value)
+    parts = []
+    while magnitude >= _PART:
+        magnitude, part = divmod(magnitude, _PART)
+        parts.append(f"{part:0{_PART_DIGITS}d}")
+    parts.append(f"{magnitude:d}")
+    return ("-" if value < 0 else "") + "".join(reversed(parts))
 
 
 def _query(
