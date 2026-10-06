@@ -80,4 +80,11 @@ jobs:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0
       - name: Compare contract/ with its tag
-        run: uv run python scripts/check_contract.py
+        env:
+          # financial-data-api is private, and this workflow's own token
+          # cannot read it. A token with read access to its contents lets
+          # git fetch the tag; without one, the fetch fails.
+          GH_TOKEN: ${{ secrets.CONTRACT_REPO_TOKEN }}
+        run: |
+          if [ -n "$GH_TOKEN" ]; then gh auth setup-git; fi
+          uv run python scripts/check_contract.py
