@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import copy
 import json
+import pickle
 import traceback
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from types import MappingProxyType
 from typing import Any
 
 import pytest
@@ -12,6 +15,10 @@ import pytest
 from financial_data import (
     APIError,
     AuthenticationError,
+    ClientClosedError,
+    ConfigError,
+    DeadlineExceededError,
+    FinancialDataError,
     InvalidRequestError,
     NotEntitledError,
     NotFoundError,
@@ -21,6 +28,7 @@ from financial_data import (
     PositionExpiredError,
     RateLimitError,
     ServerError,
+    TransportError,
     UnexpectedResponseError,
     UnsupportedAPIVersionError,
 )
@@ -602,3 +610,75 @@ def test_refused_body_becomes_an_unexpected_response_naming_member_and_index() -
         raise error
     assert caught.value.__cause__ is None
     assert caught.value.__context__ is None
+
+
+# Pickling and copying
+
+
+def problem_error(status: int, code: str) -> Callable[[], APIError]:
+    """An exception for a problem response that echoes the key, redacted."""
+    body = problem_body(
+        status, code, detail=f"Bearer {KEY} is bad.", echo={KEY: [f"x{KEY}", 1]}
+    )
+    return lambda: error_for(
+        status, body, retry_after=2.0, request_id=f"req-{KEY}", attempts=3
+    )
+
+
+EXCEPTIONS: list[tuple[str, Callable[[], FinancialDataError]]] = [
+    ("FinancialDataError", lambda: FinancialDataError("a message")),
+    ("ConfigError", lambda: ConfigError("timeout must be positive")),
+    ("ClientClosedError", lambda: ClientClosedError("the client is closed")),
+    *((f"{code}-{status}", problem_error(status, code)) for status, code, _ in ROWS),
+    ("APIError-without-a-problem", lambda: error_for(404, b"<html>", "text/html")),
+    (
+        "TransportError",
+        lambda: TransportError(
+            "connection refused", method="GET", path=PATH, attempts=4
+        ),
+    ),
+    (
+        "DeadlineExceededError",
+        lambda: DeadlineExceededError(
+            "the deadline passed", method="GET", path=PATH, attempts=2
+        ),
+    ),
+    (
+        "UnexpectedResponseError",
+        lambda: unexpected_response(
+            "data[0].sequence is missing",
+            status=200,
+            request_id=f"req-{KEY}",
+            method="GET",
+            path=PATH,
+            attempts=1,
+            secret=KEY,
+        ),
+    ),
+]
+
+
+@pytest.mark.parametrize(
+    "duplicate",
+    [lambda error: pickle.loads(pickle.dumps(error)), copy.copy, copy.deepcopy],
+    ids=["pickle", "copy", "deepcopy"],
+)
+@pytest.mark.parametrize(
+    "make", [make for _, make in EXCEPTIONS], ids=[name for name, _ in EXCEPTIONS]
+)
+def test_exception_survives_pickling_and_copying(
+    make: Callable[[], FinancialDataError],
+    duplicate: Callable[[FinancialDataError], FinancialDataError],
+) -> None:
+    # A process pool pickles the exception a worker raises.
+    error = make()
+    again = duplicate(error)
+    assert type(again) is type(error)
+    assert again.args == error.args
+    assert str(again) == str(error)
+    assert vars(again) == vars(error)
+    if isinstance(again, APIError) and again.problem is not None:
+        assert isinstance(again.problem, MappingProxyType)
+        with pytest.raises(TypeError):
+            again.problem["code"] = "changed"  # type: ignore[index]
+    assert_without_key(again)

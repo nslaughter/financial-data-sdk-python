@@ -22,6 +22,27 @@ REDACTED: Final = "[redacted]"
 class FinancialDataError(Exception):
     """Base class of every exception the SDK raises."""
 
+    def __reduce__(self) -> tuple[Any, ...]:
+        # pickle and copy would call the class with `args`, the message
+        # alone, which an `__init__` with required keyword arguments refuses.
+        # A process pool pickles the exception a worker raises, so make it
+        # from `args` without `__init__`, then restore its attributes.
+        return (_rebuild, (type(self), self.args), dict(vars(self)))
+
+
+def _rebuild(
+    cls: type[FinancialDataError], args: tuple[Any, ...]
+) -> FinancialDataError:
+    """Make an exception with these `args` without calling its `__init__`.
+
+    `args` is set after `__new__`, because `OSError.__new__`, which
+    `DeadlineExceededError` inherits through `TimeoutError`, leaves `args`
+    empty for a subclass with its own `__init__`.
+    """
+    error = cls.__new__(cls)
+    error.args = args
+    return error
+
 
 class ConfigError(FinancialDataError, ValueError):
     """An argument of `Client`, `with_options`, or `RetryPolicy` is invalid.
@@ -93,6 +114,17 @@ class APIError(FinancialDataError):
         self.method = method
         self.path = path
         self.attempts = attempts
+
+    def __reduce__(self) -> tuple[Any, ...]:
+        rebuild, args, state = super().__reduce__()
+        if self.problem is not None:  # a mapping proxy cannot be pickled
+            state["problem"] = dict(self.problem)
+        return (rebuild, args, state)
+
+    def __setstate__(self, state: dict[str, Any] | None, /) -> None:
+        if state is not None and state.get("problem") is not None:
+            state = {**state, "problem": MappingProxyType(dict(state["problem"]))}
+        super().__setstate__(state)
 
 
 class InvalidRequestError(APIError):
