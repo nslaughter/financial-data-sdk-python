@@ -32,7 +32,7 @@ follows.
 | Step | Owner specifications | Status | Pull request |
 | --- | --- | --- | --- |
 | 1. Create the package, records, errors, and configuration | D1, D4, D5 | Done | [#2](https://github.com/nslaughter/financial-data-sdk-python/pull/2) |
-| 2. Decode responses and format arguments | D1 | Not started | |
+| 2. Decode responses and format arguments | D1 | Done | |
 | 3. Send requests with retries and deadlines | D1, D7, D9 | Not started | |
 | 4. Query the catalog, observations, and the change stream | | Not started | |
 | 5. Convert records to pandas | D6 | Not started | |
