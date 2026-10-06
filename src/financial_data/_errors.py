@@ -237,8 +237,14 @@ _BY_CODE: Final[dict[tuple[int, str], type[APIError]]] = {
 
 
 def redact(text: str, secret: str) -> str:
-    """Replace every occurrence of the key in text with `[redacted]`."""
-    return text.replace(secret, REDACTED)
+    """Replace every occurrence of the key in text with `[redacted]`.
+
+    A key with `[` or `]` in it can form again where `[redacted]` meets the
+    text beside it, as the key `x[` does in `xx[`. Keeping the key out comes
+    before keeping the text exact, so such text is replaced whole.
+    """
+    redacted = text.replace(secret, REDACTED)
+    return REDACTED if secret in redacted else redacted
 
 
 def _redact_json(document: dict[str, Any], secret: str) -> dict[str, Any]:
@@ -307,10 +313,19 @@ def _phrase(status: int) -> str | None:
         return None
 
 
-def _request(method: str, path: str, request_id: str | None) -> str:
+def _message(
+    head: str, method: str, path: str, request_id: str | None, secret: str
+) -> str:
+    """Write an exception's message, naming the request.
+
+    Each part is already redacted, but the key can span where two meet, as
+    `found:` does in `404 not_found: ...`, so the whole is redacted too.
+    """
     if request_id is None:
-        return f"({method} {path})"
-    return f"({method} {path}; request_id {request_id})"
+        message = f"{head} ({method} {path})"
+    else:
+        message = f"{head} ({method} {path}; request_id {request_id})"
+    return redact(message, secret)
 
 
 def api_error(
@@ -352,7 +367,7 @@ def api_error(
     if text:
         head = f"{head}: {text}"
     return _exception_class(status, code)(
-        f"{head} {_request(method, path, request_id)}",
+        _message(head, method, path, request_id, secret),
         status=status,
         method=method,
         path=path,
@@ -387,7 +402,7 @@ def unexpected_response(
         request_id = redact(request_id, secret)
     head = reason if status is None else f"{status}: {reason}"
     return UnexpectedResponseError(
-        f"{head} {_request(method, path, request_id)}",
+        _message(head, method, path, request_id, secret),
         status=status,
         method=method,
         path=path,

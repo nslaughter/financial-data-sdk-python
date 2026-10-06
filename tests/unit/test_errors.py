@@ -112,8 +112,6 @@ def test_problem_response_raises_its_rows_exception(
     assert error.retry_after == 2.0
     assert error.request_id == "req_1"
     assert (error.method, error.path, error.attempts) == ("GET", PATH, 3)
-    assert error.__cause__ is None
-    assert error.__context__ is None
 
 
 # A known code with a status its row does not have claims nothing more than
@@ -216,7 +214,6 @@ def test_response_that_is_not_a_problem_response(
     assert type(error) is APIError
     assert error.code is None
     assert error.problem is None
-    assert error.__context__ is None
 
 
 @pytest.mark.parametrize(
@@ -318,7 +315,7 @@ def test_str_without_a_problem_body_names_what_the_status_means(
 # The key in a response
 
 
-def assert_without_key(error: BaseException) -> None:
+def assert_without_key(error: BaseException, key: str = KEY) -> None:
     """The key is in no rendering of the exception and none of its attributes."""
     texts = [
         str(error),
@@ -328,7 +325,7 @@ def assert_without_key(error: BaseException) -> None:
         *(repr(value) for value in vars(error).values()),
     ]
     for text in texts:
-        assert KEY not in text
+        assert key not in text
 
 
 def test_key_in_a_problem_body_is_redacted_at_every_depth() -> None:
@@ -405,6 +402,57 @@ def test_redact_replaces_every_occurrence() -> None:
     assert redact("nothing here", KEY) == "nothing here"
 
 
+@pytest.mark.parametrize(
+    ("text", "key"),
+    [("xx[", "x["), ("acted]zz", "acted]z"), ("one x[ two xx[ three", "x[")],
+    ids=["before", "after", "among-others"],
+)
+def test_text_where_redacting_forms_the_key_again_is_replaced_whole(
+    text: str, key: str
+) -> None:
+    # One replacement leaves the key where [redacted] meets the text beside it.
+    assert key in text.replace(key, "[redacted]")
+    assert redact(text, key) == "[redacted]"
+
+
+def test_key_spanning_the_code_and_the_detail_is_redacted() -> None:
+    key = "found:"
+    error = error_for(404, problem_body(404, "not_found", detail="No such series."))
+    assert key in str(error)
+    error = error_for(
+        404, problem_body(404, "not_found", detail="No such series."), secret=key
+    )
+    assert type(error) is NotFoundError
+    assert error.code == "not_found"
+    assert str(error) == f"404 not_[redacted] No such series. (GET {PATH})"
+    assert_without_key(error, key)
+
+
+def test_key_spanning_the_request_id_and_the_text_after_it_is_redacted() -> None:
+    key = "req_1)"
+    error = error_for(500, None, None, request_id="req_1", secret=key)
+    assert error.request_id == "req_1"
+    assert str(error) == (
+        f"500: Internal Server Error (GET {PATH}; request_id [redacted]"
+    )
+    assert_without_key(error, key)
+
+
+def test_key_spanning_the_status_and_the_reason_is_redacted() -> None:
+    key = "302: a"
+    error = unexpected_response(
+        "a 302 response",
+        status=302,
+        request_id=None,
+        method="GET",
+        path=PATH,
+        attempts=1,
+        secret=key,
+    )
+    assert str(error) == f"[redacted] 302 response (GET {PATH})"
+    assert_without_key(error, key)
+
+
 # Unexpected responses
 
 
@@ -475,4 +523,7 @@ def test_refused_body_becomes_an_unexpected_response_naming_member_and_index() -
         "200: data[0].sequence is missing "
         "(GET /v1/datasets/core-indicators/changes?after=0)"
     )
-    assert error.__context__ is None
+    with pytest.raises(UnexpectedResponseError) as caught:
+        raise error
+    assert caught.value.__cause__ is None
+    assert caught.value.__context__ is None
