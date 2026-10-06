@@ -10,14 +10,16 @@ design the client interfaces, examples, and release processes their customers
 depend on. This project will make that approach inspectable through a small
 research workflow.
 
-**Status:** Specification approved. This repository contains this
-README and the SDK's specification: the [client contract](spec/client.md),
-the [conformance scenarios](spec/conformance.md), the
-[implementation plan](docs/implementation-plan.md), and the rules for
-implementation agents in [`AGENTS.md`](AGENTS.md). The contract's nine
-design decisions are settled as owner specifications. None of the SDK has
-been implemented or tested yet. The demo API and the shared data contract
-live in [financial-data-api](https://github.com/nslaughter/financial-data-api).
+**Status:** In development. The SDK's package, records, errors, and
+configuration are implemented and tested, and the
+[Progress table](docs/implementation-plan.md#progress) of the
+[implementation plan](docs/implementation-plan.md) shows each step's status.
+The specification is approved: the [client contract](spec/client.md), the
+[conformance scenarios](spec/conformance.md), and the rules for
+implementation agents in [`AGENTS.md`](AGENTS.md), with the contract's nine
+design decisions settled as owner specifications. The demo API and the
+shared data contract live in
+[financial-data-api](https://github.com/nslaughter/financial-data-api).
 The dataset is synthetic, and this is a demonstration project, not client
 work.
 
