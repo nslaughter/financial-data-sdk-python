@@ -451,3 +451,51 @@ def unexpected_response(
         attempts=attempts,
         request_id=request_id,
     )
+
+
+def _failure(kind: str, detail: str) -> str:
+    """Name an exception from httpx: its class, and its message if it has one."""
+    return f"{kind}: {detail}" if detail else kind
+
+
+def transport_error(
+    kind: str, detail: str, *, method: str, path: str, attempts: int, secret: str
+) -> TransportError:
+    """Return the exception for an `httpx.TransportError` once retries stop.
+
+    `kind` is the class of httpx's exception and `detail` its message, with
+    the key already replaced. `path` is as for `api_error`.
+    """
+    return TransportError(
+        _message(_failure(kind, detail), method, path, None, secret),
+        method=method,
+        path=path,
+        attempts=attempts,
+    )
+
+
+def deadline_exceeded(
+    timeout: float,
+    *,
+    kind: str | None,
+    detail: str,
+    method: str,
+    path: str,
+    attempts: int,
+    secret: str,
+) -> DeadlineExceededError:
+    """Return the exception for a call whose deadline passed.
+
+    `timeout` is the call's deadline in seconds. `kind` is the class of the
+    httpx timeout that expired and `detail` its message, or `kind` is
+    `None` when the SDK found the deadline passed itself.
+    """
+    head = f"the deadline of {timeout:g} s passed"
+    if kind is not None:
+        head = f"{head}: {_failure(kind, detail)}"
+    return DeadlineExceededError(
+        _message(head, method, path, None, secret),
+        method=method,
+        path=path,
+        attempts=attempts,
+    )

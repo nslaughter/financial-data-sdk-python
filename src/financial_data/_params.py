@@ -18,6 +18,8 @@ from datetime import date, datetime, timedelta
 from typing import Final
 from urllib.parse import quote
 
+from ._errors import REDACTED, redact
+
 _MICROSECOND: Final = timedelta(microseconds=1)
 _LAST_ORDINAL: Final = date.max.toordinal()
 # Fewer digits than the least limit `sys.set_int_max_str_digits()` accepts.
@@ -36,6 +38,39 @@ class Target:
     def path(self) -> str:
         """The path, each segment percent-encoded with no safe characters."""
         return "".join(f"/{encode_segment(segment)}" for segment in self.segments)
+
+    @property
+    def path_with_query(self) -> str:
+        """The path and the query string, as sent.
+
+        Query names and values are percent-encoded as path segments are, so
+        `+`, `&`, and `=` in a value reach the API as given, and a lone
+        surrogate is encoded as its code unit rather than refused.
+        """
+        return self._write(encode_segment)
+
+    def reported(self, secret: str) -> str:
+        """Return `path_with_query` as the SDK reports it, without the key.
+
+        Each path segment and query value whose text, before
+        percent-encoding, contains the key is replaced with `[redacted]`.
+        The key can also span two parts, or be in the SDK's own text, so the
+        whole is redacted too, as an exception's message is.
+        """
+
+        def part(text: str) -> str:
+            return REDACTED if secret in text else encode_segment(text)
+
+        return redact(self._write(part), secret)
+
+    def _write(self, part: Callable[[str], str]) -> str:
+        path = "".join(f"/{part(segment)}" for segment in self.segments)
+        if not self.query:
+            return path
+        query = "&".join(
+            f"{encode_segment(name)}={part(value)}" for name, value in self.query
+        )
+        return f"{path}?{query}"
 
 
 def encode_segment(text: str) -> str:
