@@ -492,14 +492,24 @@ def _reported_url(base_url: str, path: str, secret: str) -> httpx.URL:
     """Return the URL to leave on httpx's exceptions: the request's, without the key.
 
     `path` is the path as the SDK reports it, with `[redacted]` in place of
-    each argument that holds the key. The base URL can hold the key too, as
-    a gateway's path prefix might.
+    each argument that holds the key. The base URL can hold the key too. In
+    its path, as a gateway's prefix might hold it, the key is replaced where
+    it is. Where `[redacted]` would change the scheme, host, or port, the
+    whole URL is `[redacted]`, rather than one that names another host.
     """
-    text = redact(base_url + path, secret)
+    base = httpx.URL(base_url)
     try:
-        return httpx.URL(text)
-    except httpx.InvalidURL:  # the key was in the host, where [redacted] is not
+        url = httpx.URL(redact(base_url + path, secret))
+    except httpx.InvalidURL:  # such as one with [redacted] where its host begins
         return httpx.URL(REDACTED)
+    if _origin(url) != _origin(base):
+        return httpx.URL(REDACTED)
+    return url
+
+
+def _origin(url: httpx.URL) -> tuple[str, bytes, bytes]:
+    """Return a URL's scheme, user information, host, and port."""
+    return url.scheme, url.userinfo, url.netloc
 
 
 def _scrub(error: BaseException, secret: str, url: httpx.URL) -> None:

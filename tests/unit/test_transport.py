@@ -1194,13 +1194,31 @@ def test_a_key_in_the_base_url_is_kept_out_of_the_chain(
     assert_key_absent(caught.value, logs)
 
 
-def test_a_key_in_the_host_is_kept_out_of_the_chain(clock: Clock) -> None:
+@pytest.mark.parametrize(
+    ("key", "base_url"),
+    [
+        ("gateway", "http://gateway.test"),
+        ("example", "http://api.example.test"),
+        ("gateway", "http://gateway.test/gateway"),
+        ("8443", "https://api.test:8443"),
+        ("https", "https://api.test"),
+        ("test/v", "http://api.test"),
+        ("/v1", "http://api.test"),
+        ("/prefix", "http://api.test/prefix"),
+    ],
+)
+def test_a_key_that_would_change_the_host_redacts_the_whole_url(
+    clock: Clock, logs: pytest.LogCaptureFixture, key: str, base_url: str
+) -> None:
+    # Before the path, [redacted] would make a host httpx cannot parse, or
+    # another host, as `http://api.test[redacted]/meta` does.
     api = API(fail(httpx.ConnectError))
-    transport, _ = connect(api, clock, key="gateway", base_url="http://gateway.test")
+    transport, _ = connect(api, clock, key=key, base_url=base_url)
     with pytest.raises(TransportError) as caught:
         get_meta(transport)
     [request] = requests_in(caught.value)
-    assert "gateway" not in str(request.url)
+    assert request.url == httpx.URL("[redacted]")
+    assert_key_absent(caught.value, logs, key=key)
 
 
 def test_a_key_in_the_host_is_kept_out_of_the_host_header(clock: Clock) -> None:
