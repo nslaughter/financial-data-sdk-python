@@ -252,7 +252,7 @@ class _Observations(_Resource):
             )
 
         first = target(page_token)
-        return _observation_pages(self._client, first, target, page_token)
+        return _observation_pages(self._client, first, target)
 
     def iterate(
         self,
@@ -304,10 +304,11 @@ def _observation_pages(
     client: Client,
     first: Target,
     target: Callable[[str], Target],
-    page_token: str | None,
 ) -> Generator[ObservationPage, None, None]:
     """Fetch a query's pages one at a time, as the caller asks for them."""
-    sent: set[str] = set() if page_token is None else {page_token}
+    # The tokens as sent, so a `page_token` given as a str subclass is held
+    # as its text, which hashes and compares as a str, as a page's does.
+    sent = {value for name, value in first.query if name == "page_token"}
     position: int | None = None
 
     def check(page: ObservationPage) -> str | None:

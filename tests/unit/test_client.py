@@ -587,14 +587,56 @@ def test_a_page_that_leads_back_to_an_earlier_page_raises(
     assert len(api.sent) == 3
 
 
-@pytest.mark.parametrize("number", [2, 3])
-def test_a_page_that_returns_the_token_the_iterator_started_from_raises(
-    client: Client, api: FakeAPI, number: int
+class Unhashable(str):
+    """A str that a set cannot hold."""
+
+    __hash__ = None  # type: ignore[assignment]
+
+
+class OwnHash(str):
+    """A str that hashes unlike its text."""
+
+    def __hash__(self) -> int:
+        return 0
+
+
+class NeverEqual(str):
+    """A str equal to nothing, not even its text."""
+
+    def __eq__(self, other: object) -> bool:
+        return False
+
+    __hash__ = str.__hash__
+
+
+TOKEN_TYPES = [str, Unhashable, OwnHash, NeverEqual]
+
+
+@pytest.mark.parametrize("token_type", TOKEN_TYPES)
+def test_resuming_from_a_str_subclass_sends_its_text(
+    client: Client, api: FakeAPI, token_type: type[str]
 ) -> None:
     first = client.observations.page(SERIES_ID, page_size=10)
+    assert first.next_page_token is not None
+    resumed = drain(
+        client.observations.pages(
+            SERIES_ID, page_size=10, page_token=token_type(first.next_page_token)
+        )
+    )
+    assert tokens_sent(api)[1] == first.next_page_token
+    assert records([first, *resumed]) == select()
+
+
+@pytest.mark.parametrize("token_type", TOKEN_TYPES)
+@pytest.mark.parametrize("number", [2, 3])
+def test_a_page_that_returns_the_token_the_iterator_started_from_raises(
+    client: Client, api: FakeAPI, number: int, token_type: type[str]
+) -> None:
+    first = client.observations.page(SERIES_ID, page_size=10)
+    assert first.next_page_token is not None
     api.rewrite(number, lambda body: {**body, "next_page_token": first.next_page_token})
     pages = client.observations.pages(
-        SERIES_ID, page_size=10, page_token=first.next_page_token
+        SERIES_ID, page_size=10, page_token=token_type(first.next_page_token)
     )
     returned = list(islice(pages, number - 2))
     with pytest.raises(UnexpectedResponseError, match="already sent"):
