@@ -119,14 +119,14 @@ def parse_retry_after(value: str | None, now: datetime) -> float | None:
     text = value.strip(" \t")
     if _SECONDS.fullmatch(text):
         return float(text)
-    moment = _http_date(text, now)
-    if moment is None:
+    seconds = _seconds_until(text, now)
+    if seconds is None:
         return None
-    return max(0.0, (moment - now).total_seconds())
+    return max(0.0, seconds)
 
 
-def _http_date(text: str, now: datetime) -> datetime | None:
-    """Return an HTTP date as an aware `datetime` in UTC, or `None` if invalid.
+def _seconds_until(text: str, now: datetime) -> float | None:
+    """Return the seconds from `now` until an HTTP date, or `None` if invalid.
 
     The day name is checked for its form only, as most HTTP libraries do.
     """
@@ -145,18 +145,22 @@ def _http_date(text: str, now: datetime) -> datetime | None:
         year += now.year - now.year % 100
         if year > now.year + 50:
             year -= 100
+    # RFC 9110 allows second 60, a leap second, which `datetime` cannot hold.
+    # It is the second after second 59.
+    leap = match["second"] == "60"
     try:
-        return datetime(
+        moment = datetime(
             year,
             _MONTHS.index(match["month"]) + 1,
             int(match["day"]),
             int(match["hour"]),
             int(match["minute"]),
-            int(match["second"]),
+            59 if leap else int(match["second"]),
             tzinfo=UTC,
         )
     except ValueError:  # an impossible date or time, such as February 30
         return None
+    return (moment - now).total_seconds() + (1.0 if leap else 0.0)
 
 
 # Bounds

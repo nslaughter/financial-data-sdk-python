@@ -20,6 +20,7 @@ from financial_data._retry import (
 )
 
 NOW = datetime(2026, 10, 6, 12, 0, 0, tzinfo=UTC)
+MAX = datetime(9999, 12, 31, 23, 59, 59, tzinfo=UTC)
 NO_JITTER = RetryPolicy(jitter=False)
 
 
@@ -211,6 +212,23 @@ def test_asctime_with_a_two_digit_day() -> None:
 
 
 @pytest.mark.parametrize(
+    ("value", "seconds"),
+    [
+        ("Tue, 06 Oct 2026 23:59:60 GMT", 12 * 3600.0),
+        ("Tuesday, 06-Oct-26 23:59:60 GMT", 12 * 3600.0),
+        ("Tue Oct  6 23:59:60 2026", 12 * 3600.0),
+        ("Tue, 06 Oct 2026 12:00:60 GMT", 60.0),
+        ("Tue, 06 Oct 2026 11:59:60 GMT", 0.0),
+        ("Fri, 31 Dec 9999 23:59:60 GMT", (MAX - NOW).total_seconds() + 1.0),
+    ],
+)
+def test_a_leap_second_is_the_second_after_second_59(
+    value: str, seconds: float
+) -> None:
+    assert parse_retry_after(value, NOW) == seconds
+
+
+@pytest.mark.parametrize(
     "value",
     [
         "Tue, 06 Oct 2026 11:59:59 GMT",
@@ -265,7 +283,7 @@ def test_an_rfc_850_year_more_than_50_years_ahead_is_in_the_past(
         "Tue 06 Oct 2026 12:00:05 GMT",
         "Tue, 30 Feb 2026 12:00:05 GMT",
         "Tue, 06 Oct 2026 24:00:00 GMT",
-        "Tue, 06 Oct 2026 23:59:60 GMT",
+        "Tue, 06 Oct 2026 23:59:61 GMT",
         "Tue, 06 Oct 0000 12:00:05 GMT",
         "Tue, 06 Oct 2026 12:00:05 GMT trailing",
         "Tues, 06 Oct 2026 12:00:05 GMT",
