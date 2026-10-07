@@ -507,7 +507,9 @@ def _scrub(error: BaseException, secret: str, url: httpx.URL) -> None:
 
     The request of each httpx exception reachable through `__cause__` and
     `__context__`, the exception itself included, gets `Bearer [redacted]`
-    as its `Authorization` and the URL without the key. In the arguments of
+    as its `Authorization`, the URL without the key, and `[redacted]` in
+    place of the key in its other headers, such as a `Host` that holds the
+    key because the base URL's host does. In the arguments of
     each exception reachable, every occurrence of the key is replaced with
     `[redacted]`: httpx, httpcore, and h11 quote a response line they could
     not parse there, and httpcore passes h11's exception as an argument.
@@ -522,6 +524,9 @@ def _scrub(error: BaseException, secret: str, url: httpx.URL) -> None:
         if isinstance(current, httpx.HTTPError):
             request = current._request
             if request is not None:
+                for name, value in request.headers.items():
+                    if secret in value:
+                        request.headers[name] = redact(value, secret)
                 if "Authorization" in request.headers:
                     request.headers["Authorization"] = _REDACTED_AUTHORIZATION
                 request.url = url

@@ -1203,6 +1203,16 @@ def test_a_key_in_the_host_is_kept_out_of_the_chain(clock: Clock) -> None:
     assert "gateway" not in str(request.url)
 
 
+def test_a_key_in_the_host_is_kept_out_of_the_host_header(clock: Clock) -> None:
+    api = API(fail(httpx.ConnectError))
+    transport, _ = connect(api, clock, key="gateway", base_url="http://gateway.test")
+    with pytest.raises(TransportError) as caught:
+        get_meta(transport)
+    [request] = requests_in(caught.value)
+    assert api.sent[0].header("Host") == ["gateway.test"]
+    assert request.headers["Host"] == "[redacted].test"
+
+
 @pytest.mark.parametrize(
     "step",
     [
