@@ -94,10 +94,18 @@ class Pool:
 
     def get(self) -> httpx.Client:
         """Return the HTTP client for the next request."""
-        if self._source is not None:
-            if self._closed:
+        # Each view up to the pool that is not one, in a loop rather than by
+        # recursion, so that a client derived from a derived client, however
+        # many times over, cannot exceed the recursion limit.
+        pool = self
+        while pool._source is not None:
+            if pool._closed:
                 raise ClientClosedError("the client is closed")
-            return self._source.get()
+            pool = pool._source
+        return pool._client()
+
+    def _client(self) -> httpx.Client:
+        """Return this pool's HTTP client, creating the SDK's own if needed."""
         with self._lock:
             if self._closed:
                 raise ClientClosedError("the client is closed")

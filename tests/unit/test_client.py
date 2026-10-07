@@ -8,6 +8,7 @@ the `httpx.Client` the SDK creates through a subclass that replaces
 
 from __future__ import annotations
 
+import sys
 from collections.abc import Callable, Iterator
 from datetime import UTC, date, datetime, timedelta, timezone
 from decimal import Decimal
@@ -930,6 +931,25 @@ def test_a_derived_client_shares_the_pool_without_owning_it(
     client.datasets.list()
     client.close()
     assert created[0].is_closed
+
+
+def test_a_client_derived_many_times_over_checks_every_client_before_it(
+    client: Client, api: FakeAPI
+) -> None:
+    # More derivations than the recursion limit allows nested calls.
+    chain = [client]
+    for _ in range(2 * sys.getrecursionlimit()):
+        chain.append(chain[-1].with_options(timeout=5.0))
+    assert chain[-1].meta().api_version == "v1"
+    middle = len(chain) // 2
+    chain[middle].close()
+    with pytest.raises(ClientClosedError):
+        chain[-1].meta()
+    assert chain[middle - 1].meta().api_version == "v1"
+    client.close()
+    with pytest.raises(ClientClosedError):
+        chain[1].meta()
+    assert len(api.sent) == 2
 
 
 def test_leaving_a_derived_clients_with_block_leaves_the_pool_open(
