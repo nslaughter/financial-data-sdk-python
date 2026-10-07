@@ -38,22 +38,16 @@ follows.
 | 5. Convert records to pandas | D6 | Not started | |
 | 6. Build the SDK runner and the fault proxy | D3, D5 | Not started | |
 | 7. Document the types against the contract | | Not started | |
-| 8. Pass the stage 1 shared checks against the API image | D5 | Waiting on the API | |
-| 9. Run the SDK scenarios | D3 | Waiting on the API | |
-| 10. Add the research and scheduled-job examples | D2, D6 | Waiting on the API | |
+| 8. Pass the stage 1 shared checks against the API image | D5 | Not started | |
+| 9. Run the SDK scenarios | D3 | Not started | |
+| 10. Add the research and scheduled-job examples | D2, D6 | Not started | |
 | 11. Check request IDs against contract 0.4.0 | D7 | Waiting on the API | |
 | 12. Release a tagged distribution | D8 | Not started | |
 
-What each step that cannot start yet needs:
-
-- **Steps 8 to 10** need the stage 1 image, which is the API's plan
-  [step 7](https://github.com/nslaughter/financial-data-api/blob/main/docs/implementation-plan.md#7-publish-the-demo-api-image).
-  That step itself waits on the operator's choice of image name and tag
-  scheme.
-- **Step 11** needs contract version 0.4.0 with the `Request-Id` header
-  (D7), tagged in financial-data-api, an image that implements it, and an
-  operator-approved version of the specifications that pins it, since D5
-  pins 0.3.0.
+**Step 11** needs contract version 0.4.0 with the `Request-Id` header (D7),
+tagged in financial-data-api, an image that implements it, and an
+operator-approved version of the specifications that pins it, since D5 pins
+0.3.0.
 
 If the operator changes an owner specification, the scenarios that name it
 may need to change. That change is a new version of the specification, made
@@ -382,9 +376,17 @@ Out of scope: running against the real API.
 
 ### 8. Pass the stage 1 shared checks against the API image
 
-Before this step starts, financial-data-api publishes its stage 1 image
-(its plan step 7), the operator records the image and tag here, and the
-step's status changes to `Not started`.
+financial-data-api published its stage 1 image in its release `v0.1.0`
+(its plan step 7). On 2026-10-07 the operator recorded it as the image steps
+8 to 10 use: `ghcr.io/nslaughter/financial-data-api:0.1.0`. Its labels name
+contract version 0.3.0 and stage 1.
+
+The API's later image, `0.2.0`, serves stage 2, which the SDK does not
+implement. The runner must be given the stage of the server it runs
+against, so that image needs a stage 2 run, with checks of features the SDK
+lacks. A stage 1 run against it fails the `request-errors` scenario in which
+a stage 1 server refuses stage 2 parameters and paths. Moving to it needs a
+new version of the specifications.
 
 - Set `api_image` in `contract/CONTRACT.json`. This step may change
   `contract/` only there.
@@ -398,7 +400,7 @@ step's status changes to `Not started`.
 
 ### 9. Run the SDK scenarios
 
-Waits for the same image as step 8.
+Uses the same image as step 8.
 
 - Add a CI job that, on every supported Python version, starts the image,
   installs the built wheel with its `pandas` extra in a clean virtual
@@ -410,7 +412,7 @@ Waits for the same image as step 8.
 
 ### 10. Add the research and scheduled-job examples
 
-Follows D2 and D6. Waits for the same image as step 8.
+Follows D2 and D6. Uses the same image as step 8.
 
 - `examples/research.py` and `examples/scheduled_job.py`, as
   [Examples](../spec/client.md#examples-d2) says. They use only public
