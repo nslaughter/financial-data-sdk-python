@@ -72,16 +72,32 @@ class Pool:
     `Client` does no I/O until a call, and closes it in `close()`. It never
     closes a client the caller supplied, and a call through one the caller
     has closed raises `ClientClosedError`.
+
+    A derived client uses a view of its source's pool, from `derive()`.
+    Closing a view closes nothing but the view, and a call through one
+    raises `ClientClosedError` once it, or any pool it was derived from, is
+    closed.
     """
 
-    def __init__(self, supplied: httpx.Client | None) -> None:
+    def __init__(
+        self, supplied: httpx.Client | None, *, source: Pool | None = None
+    ) -> None:
         self._supplied = supplied
+        self._source = source
         self._own: httpx.Client | None = None
         self._closed = False
         self._lock = threading.Lock()
 
+    def derive(self) -> Pool:
+        """Return a view of this pool, for a derived client."""
+        return Pool(self._supplied, source=self)
+
     def get(self) -> httpx.Client:
         """Return the HTTP client for the next request."""
+        if self._source is not None:
+            if self._closed:
+                raise ClientClosedError("the client is closed")
+            return self._source.get()
         with self._lock:
             if self._closed:
                 raise ClientClosedError("the client is closed")
@@ -98,7 +114,10 @@ class Pool:
             return self._own
 
     def close(self) -> None:
-        """Close the HTTP client the SDK created. Closing twice does nothing."""
+        """Close the HTTP client the SDK created, if this pool is not a view.
+
+        Closing twice does nothing.
+        """
         with self._lock:
             self._closed = True
             own, self._own = self._own, None
@@ -222,12 +241,40 @@ class Transport:
         self._auth = _Bearer(api_key)
         self._headers = {"Accept": "application/json", "User-Agent": USER_AGENT}
 
-    def call(self, target: Target, decode: Callable[[dict[str, Any]], _T]) -> _T:
+    def derive(
+        self, *, timeout: float | None, retry: RetryPolicy, pool: Pool
+    ) -> Transport:
+        """Return a transport with the same key, base URL, and clocks.
+
+        The deadline and the retry policy are as `with_options` gives them,
+        and `pool` is a view of this transport's pool.
+        """
+        return Transport(
+            api_key=self._key,
+            base_url=self._base_url,
+            timeout=timeout,
+            retry=retry,
+            pool=pool,
+            clock=self._clock,
+            sleep=self._sleep,
+            random=self._random,
+            now=self._now,
+        )
+
+    def call(
+        self,
+        target: Target,
+        decode: Callable[[dict[str, Any]], _T],
+        check: Callable[[_T], str | None] | None = None,
+    ) -> _T:
         """Send one call, retrying as the policy allows, and decode its response.
 
         `decode` turns the response's JSON object into what the call
         returns, and raises `InvalidResponse` for one without its documented
-        form, which is not retried.
+        form, which is not retried. `check`, if given, returns why a decoded
+        page breaks a pagination guarantee, or `None` if it does not; a page
+        that breaks one raises `UnexpectedResponseError` with `status`
+        `None`, and is not retried either.
         """
         path = target.reported(self._key)
         url = self._base_url + target.path_with_query
@@ -261,7 +308,7 @@ class Transport:
                 and 200 <= outcome.status <= 299
             ):
                 return self._decode(
-                    outcome, outcome.body, decode, request_id, path, attempts
+                    outcome, outcome.body, decode, check, request_id, path, attempts
                 )
             failure = self._failure(outcome, deadline, request_id, path, attempts)
             wait = None
@@ -354,25 +401,31 @@ class Transport:
         received: _Received,
         body: bytes,
         decode: Callable[[dict[str, Any]], _T],
+        check: Callable[[_T], str | None] | None,
         request_id: str | None,
         path: str,
         attempts: int,
     ) -> _T:
-        """Validate and decode a successful response's body.
+        """Validate and decode a successful response's body, and check the page.
 
         A body that does not validate raises `UnexpectedResponseError`
-        outside the `except` block, so that no exception holds the body.
+        outside the `except` block, so that no exception holds the body. So
+        does a page that breaks a pagination guarantee, with `status` `None`.
         """
         content_type = received.headers.get("Content-Type")
+        status: int | None = received.status
         try:
             value = decode(decode_object(content_type, body))
         except InvalidResponse as invalid:
             reason = str(invalid)
         else:
-            return value
+            broken = None if check is None else check(value)
+            if broken is None:
+                return value
+            reason, status = broken, None
         raise unexpected_response(
             reason,
-            status=received.status,
+            status=status,
             request_id=request_id,
             method=_METHOD,
             path=path,
