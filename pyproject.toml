@@ -63,4 +63,9 @@ mypy_path = "src"
 testpaths = ["tests/unit"]
 addopts = ["--strict-markers", "--strict-config"]
 xfail_strict = true
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    # pandas 2.2.0, the lowest the `pandas` extra allows, warns on import that
+    # pyarrow is not installed. pandas 2.2.1 dropped the warning.
+    "ignore:\\s*Pyarrow will become a required dependency of pandas:DeprecationWarning",
+]
