@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.metadata
+import sys
 from typing import Any
 
 import pytest
@@ -83,6 +84,12 @@ def test_star_import_gives_every_public_name() -> None:
 
 def test_every_name_without_an_underscore_is_in_all() -> None:
     public = {name for name in vars(financial_data) if not name.startswith("_")}
+    # Importing `financial_data.pandas`, as the dataframe tests do, binds it to
+    # the package. It stays out of `__all__`, so that `import *` never imports
+    # pandas (D6).
+    if "pandas" in public:
+        assert vars(financial_data)["pandas"] is sys.modules["financial_data.pandas"]
+        public.remove("pandas")
     assert public <= set(financial_data.__all__)
 
 

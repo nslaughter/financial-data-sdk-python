@@ -30,6 +30,8 @@ Repository = "https://github.com/nslaughter/financial-data-sdk-python"
 [dependency-groups]
 dev = [
     "mypy>=2.4",
+    # pandas has no inline types, and mypy checks the `pandas` extra's module.
+    "pandas-stubs>=3.0",
     "pytest>=9.1",
     "ruff>=0.16",
 ]
