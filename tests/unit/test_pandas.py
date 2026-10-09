@@ -13,6 +13,7 @@ import sys
 from collections.abc import Hashable, Iterator
 from datetime import UTC, datetime
 from decimal import Decimal
+from types import SimpleNamespace
 from typing import Any
 
 import httpx
@@ -60,6 +61,12 @@ def fixture_revision(revision_id: str) -> Revision:
 
 def generate(revisions: tuple[Revision, ...]) -> Iterator[Revision]:
     yield from revisions
+
+
+def lookalike(revision: Revision) -> SimpleNamespace:
+    """An object that is not a `Revision` but has every field of `revision`."""
+    fields = dataclasses.fields(revision)
+    return SimpleNamespace(**{f.name: getattr(revision, f.name) for f in fields})
 
 
 def row(frame: pd.DataFrame, revision_id: str) -> dict[Hashable, Any]:
@@ -289,8 +296,11 @@ def test_a_generator_is_read_once_into_one_row_per_revision() -> None:
         (REVISIONS[0], "dict"),
         (None, "NoneType"),
         ("rev_jan24_1", "str"),
+        # It has every attribute the conversion reads, so only the type check
+        # refuses it.
+        (lookalike(fixture_revisions()[0]), "SimpleNamespace"),
     ],
-    ids=["dict", "none", "str"],
+    ids=["dict", "none", "str", "lookalike"],
 )
 def test_an_item_that_is_not_a_revision_raises_type_error(
     item: object, name: str
