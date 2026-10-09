@@ -36,7 +36,7 @@ follows.
 | 3. Send requests with retries and deadlines | D1, D7, D9 | Done | [#8](https://github.com/nslaughter/financial-data-sdk-python/pull/8) |
 | 4. Query the catalog, observations, and the change stream | | Done | [#10](https://github.com/nslaughter/financial-data-sdk-python/pull/10) |
 | 5. Convert records to pandas | D6 | Done | [#11](https://github.com/nslaughter/financial-data-sdk-python/pull/11) |
-| 6. Build the SDK runner and the fault proxy | D3, D5 | Done | |
+| 6. Build the SDK runner and the fault proxy | D3, D5 | Done | [#12](https://github.com/nslaughter/financial-data-sdk-python/pull/12) |
 | 7. Document the types against the contract | | Not started | |
 | 8. Pass the stage 1 shared checks against the API image | D5 | Not started | |
 | 9. Run the SDK scenarios | D3 | Not started | |
