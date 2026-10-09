@@ -78,6 +78,88 @@ jobs:
           uv run --no-sync python -c "import httpx; assert httpx.__version__ == '0.27.0'"
           uv run --no-sync pytest
 
+  pandas:
+    name: The pandas extra (Python ${{ matrix.python }}, ${{ matrix.pandas }} pandas)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13", "3.14"]
+        pandas: [lowest, latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install the development environment
+        run: uv sync --locked --all-extras
+      - name: Install the ${{ matrix.pandas }} pandas that installs on this Python
+        run: |
+          if [ "${{ matrix.pandas }}" = lowest ]; then
+            resolution=lowest-direct
+          else
+            resolution=highest
+          fi
+          # The extra's range, from pyproject.toml. --upgrade resolves pandas
+          # again instead of keeping the locked one, and with wheels only, a
+          # version without a wheel for this Python is passed over.
+          uv pip install --upgrade --resolution "$resolution" --only-binary :all: "pandas>=2.2"
+          uv run --no-sync python -c "import numpy, pandas; print('pandas', pandas.__version__, 'numpy', numpy.__version__)"
+      - name: Run the pandas tests
+        run: uv run --no-sync pytest tests/unit/test_pandas.py
+
+  without-pandas:
+    name: Without pandas (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13", "3.14"]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Build the wheel
+        run: uv build --wheel
+      - name: Install the wheel without its extra and import it
+        run: |
+          clean="$RUNNER_TEMP/clean"
+          uv venv --python "${{ matrix.python }}" "$clean"
+          uv pip install --python "$clean/bin/python" dist/*.whl
+          # Import from outside the source tree, so only the wheel can answer.
+          cd "$RUNNER_TEMP"
+          "$clean/bin/python" - <<'EOF'
+          import importlib.util
+          import sys
+
+          assert importlib.util.find_spec("pandas") is None, "pandas is installed"
+
+
+          class Watch:
+              """Record every attempt to import pandas, even one that fails."""
+
+              attempts: list[str] = []
+
+              def find_spec(self, name, path=None, target=None):
+                  if name.split(".")[0] == "pandas":
+                      self.attempts.append(name)
+                  return None
+
+
+          sys.meta_path.insert(0, Watch())
+          import financial_data
+
+          assert not Watch.attempts, Watch.attempts
+          try:
+              import financial_data.pandas
+          except ImportError as error:
+              assert "financial-data-sdk[pandas]" in str(error), error
+              print(f"ImportError: {error}")
+          else:
+              raise AssertionError("financial_data.pandas imported without pandas")
+          EOF
+
   contract:
     name: Check the vendored contract
     runs-on: ubuntu-latest

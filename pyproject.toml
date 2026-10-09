@@ -30,6 +30,8 @@ Repository = "https://github.com/nslaughter/financial-data-sdk-python"
 [dependency-groups]
 dev = [
     "mypy>=2.4",
+    # pandas has no inline types, and mypy checks the `pandas` extra's module.
+    "pandas-stubs>=3.0",
     "pytest>=9.1",
     "ruff>=0.16",
 ]
@@ -61,4 +63,9 @@ mypy_path = "src"
 testpaths = ["tests/unit"]
 addopts = ["--strict-markers", "--strict-config"]
 xfail_strict = true
-filterwarnings = ["error"]
+filterwarnings = [
+    "error",
+    # pandas 2.2.0, the lowest the `pandas` extra allows, warns on import that
+    # pyarrow is not installed. pandas 2.2.1 dropped the warning.
+    "ignore:\\s*Pyarrow will become a required dependency of pandas:DeprecationWarning",
+]
