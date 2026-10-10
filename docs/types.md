@@ -335,11 +335,13 @@ argument that holds it
   default; each page of an iterator is one call.
 - `RetryPolicy` sets the retries of one call: `max_attempts` (4),
   `max_retry_wait` (30.0 seconds), `base_delay` (0.5 seconds), `max_delay`
-  (8.0 seconds), and `jitter` (`True`). Only `429`, `500`, `502`, `503`,
-  `504`, and connection failures are retried
-  ([What is retried](../spec/client.md#what-is-retried)). A `Retry-After`
-  beyond the remaining budget or deadline raises at once, with `retry_after`
-  set, so the caller can wait that long itself.
+  (8.0 seconds), and `jitter` (`True`). Only these are retried: a `429`,
+  `500`, `502`, `503`, or `504`; a connection that fails, or that breaks or
+  closes before a complete response; a response httpx cannot parse; and,
+  when the call has no deadline, the expiry of a caller-supplied client's
+  own timeout ([What is retried](../spec/client.md#what-is-retried)). A
+  `Retry-After` beyond the remaining budget or deadline raises at once, with
+  `retry_after` set, so the caller can wait that long itself.
 - `__version__` is the distribution's version, which the SDK sends in its
   `User-Agent`.
 
