@@ -218,9 +218,9 @@ refuses one, are the caller's.
   ([positions][api-positions], [one position][dc-one-position]).
 - A **page token** is opaque: do not parse, construct, or alter one. It is
   bound to its endpoint, to every other parameter of the first request, and
-  to the key. To resume a query, call `pages()` with the same arguments and
-  `page_token` set to the saved token; `pages()` sends them unchanged
-  ([pagination][api-pagination],
+  to the key. To resume a query, call `pages()`, on a client with the same
+  key, with the same arguments and `page_token` set to the saved token;
+  `pages()` sends them unchanged ([pagination][api-pagination],
   [Resuming a query](../spec/client.md#resuming-a-query)).
 - A snapshot lives for 3,600 seconds of the API's clock from its first page
   ([retention][api-retention]).
@@ -231,7 +231,8 @@ refuses one, are the caller's.
 | --- | --- | --- | --- |
 | Used at or after `snapshot_expires_at` | `410 page_token_expired` | `PageTokenExpiredError` | Restarts the query. The SDK never restarts it, because the new snapshot has a new position ([decision 7](../spec/client.md#decisions)). |
 | Issued before the API's last reset or restart, or altered | `400 invalid_page_token` | `PageTokenError`, `code` `invalid_page_token` | Restarts the query. |
-| Sent with different arguments, to another endpoint, or with another key | `400 page_token_mismatch` | `PageTokenError`, `code` `page_token_mismatch` | Sends the first request's arguments, as `pages()` does. |
+| Sent with different arguments | `400 page_token_mismatch` | `PageTokenError`, `code` `page_token_mismatch` | Sends the first request's arguments, as `pages()` does. |
+| Sent to another endpoint, or with another key | `400 page_token_mismatch` | `PageTokenError`, `code` `page_token_mismatch` | Resumes on the endpoint the token was issued for, with the key it was issued to, or restarts the query. |
 | Sent with a key since deactivated, or no longer entitled | `401 unauthenticated` or `403 not_entitled` | `AuthenticationError` or `NotEntitledError` | Needs the key's access restored. |
 
 ### Change-stream positions
