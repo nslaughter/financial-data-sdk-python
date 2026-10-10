@@ -23,10 +23,13 @@ CONTRACT: Final = ROOT / "contract" / "CONTRACT.json"
 # Every public name: `__all__`, and the dataframe conversion (D6).
 PUBLIC_NAMES: Final = [*financial_data.__all__, *financial_data.pandas.__all__]
 
-# A link to financial-data-api, and the rest of its URL.
-API_LINK: Final = re.compile(
-    r"https://github\.com/nslaughter/financial-data-api(?=[/)\s])([^)\s]*)"
-)
+# The API's repository, and a link to it with the rest of the link's URL.
+# The repository's name ends at the first character a repository name cannot
+# hold, or at the end of the text, so a link to the repository itself counts
+# too. The rest of the URL ends at `)`, `>`, or whitespace, which end an
+# inline link, an autolink, and a reference or bare link.
+REPOSITORY: Final = "https://github.com/nslaughter/financial-data-api"
+API_LINK: Final = re.compile(re.escape(REPOSITORY) + r"(?![\w.-])([^)\s>]*)")
 
 
 def types_md() -> str:
@@ -38,6 +41,38 @@ def test_every_public_name_is_documented(name: str) -> None:
     # As a code span of its own, so `ClientClosedError` does not count for
     # `Client`.
     assert f"`{name}`" in types_md()
+
+
+@pytest.mark.parametrize(
+    ("text", "path"),
+    [
+        pytest.param(
+            f"[api]({REPOSITORY}/blob/main/spec/api.md)",
+            "/blob/main/spec/api.md",
+            id="inline",
+        ),
+        pytest.param(
+            f"[api]: {REPOSITORY}/blob/main/spec/api.md\n",
+            "/blob/main/spec/api.md",
+            id="reference",
+        ),
+        pytest.param(
+            f"<{REPOSITORY}/blob/main/spec/api.md>",
+            "/blob/main/spec/api.md",
+            id="autolink",
+        ),
+        pytest.param(f"<{REPOSITORY}>", "", id="autolink-to-the-repository"),
+        pytest.param(f"[repo]({REPOSITORY}#readme)", "#readme", id="fragment"),
+        pytest.param(f"[repo]: {REPOSITORY}?tab=readme\n", "?tab=readme", id="query"),
+        pytest.param(f"See {REPOSITORY}", "", id="bare-at-the-end"),
+    ],
+)
+def test_the_link_pattern_finds_every_form_of_link(text: str, path: str) -> None:
+    assert API_LINK.findall(text) == [path]
+
+
+def test_the_link_pattern_ignores_another_repository() -> None:
+    assert API_LINK.findall(f"<{REPOSITORY}-monitor/blob/main/README.md>") == []
 
 
 def test_links_to_the_apis_documents_name_the_pinned_tag() -> None:
