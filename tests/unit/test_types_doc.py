@@ -24,12 +24,14 @@ CONTRACT: Final = ROOT / "contract" / "CONTRACT.json"
 PUBLIC_NAMES: Final = [*financial_data.__all__, *financial_data.pandas.__all__]
 
 # The API's repository, and a link to it with the rest of the link's URL.
-# The repository's name ends at the first character a repository name cannot
-# hold, or at the end of the text, so a link to the repository itself counts
-# too. The rest of the URL ends at `)`, `>`, or whitespace, which end an
-# inline link, an autolink, and a reference or bare link.
+# A repository's name holds ASCII letters, digits, `-`, `.`, and `_`, but
+# GitHub leaves a trailing `.` or `_` out of a bare link, as at the end of a
+# sentence. So a link is to another repository only if a letter, digit, or
+# `-` follows the name, after any `.` and `_`. A link to the repository
+# itself counts too. The rest of the URL ends at `)`, `>`, or whitespace,
+# which end an inline link, an autolink, and a reference or bare link.
 REPOSITORY: Final = "https://github.com/nslaughter/financial-data-api"
-API_LINK: Final = re.compile(re.escape(REPOSITORY) + r"(?![\w.-])([^)\s>]*)")
+API_LINK: Final = re.compile(re.escape(REPOSITORY) + r"(?![._]*[A-Za-z0-9-])([^)\s>]*)")
 
 
 def types_md() -> str:
@@ -65,14 +67,17 @@ def test_every_public_name_is_documented(name: str) -> None:
         pytest.param(f"[repo]({REPOSITORY}#readme)", "#readme", id="fragment"),
         pytest.param(f"[repo]: {REPOSITORY}?tab=readme\n", "?tab=readme", id="query"),
         pytest.param(f"See {REPOSITORY}", "", id="bare-at-the-end"),
+        pytest.param(f"See {REPOSITORY}.", ".", id="bare-before-a-period"),
+        pytest.param(f"_See {REPOSITORY}._", "._", id="bare-ending-emphasis"),
     ],
 )
 def test_the_link_pattern_finds_every_form_of_link(text: str, path: str) -> None:
     assert API_LINK.findall(text) == [path]
 
 
-def test_the_link_pattern_ignores_another_repository() -> None:
-    assert API_LINK.findall(f"<{REPOSITORY}-monitor/blob/main/README.md>") == []
+@pytest.mark.parametrize("suffix", ["-monitor", ".go", "_v2"])
+def test_the_link_pattern_ignores_another_repository(suffix: str) -> None:
+    assert API_LINK.findall(f"<{REPOSITORY}{suffix}/blob/main/README.md>") == []
 
 
 def test_links_to_the_apis_documents_name_the_pinned_tag() -> None:
