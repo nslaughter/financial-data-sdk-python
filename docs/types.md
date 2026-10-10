@@ -275,7 +275,7 @@ base URL is an `APIError`, not a `NotFoundError`
 | `FinancialDataError` | `Exception` | Those of its subclasses | The base class of every exception below. |
 | `ConfigError` | `FinancialDataError`, `ValueError` | No request is sent | An argument of `Client`, `with_options`, or `RetryPolicy` is invalid, or no key is given or set in the environment. |
 | `ClientClosedError` | `FinancialDataError`, `RuntimeError` | No request is sent | A call is made on a closed client, on a client derived from one, or through a caller-supplied HTTP client the caller has closed. |
-| `APIError` | `FinancialDataError` | Any `4xx` that no row below names | The API, or something in front of it, refused the request, and no subclass applies. It is the base class of the exceptions below. |
+| `APIError` | `FinancialDataError` | Any `4xx` that no row below names | The API, or something in front of it, refused the request, and no subclass applies. It is the base class of `InvalidRequestError` through `ServerError`, but not of the three exceptions after them, so `except APIError` does not catch a transport failure, a passed deadline, or an unexpected response. |
 | `InvalidRequestError` | `APIError` | `400` `unknown_parameter`, `missing_parameter`, `invalid_parameter`, `conflicting_cutoffs`, or `cutoff_in_future` | The API refused an argument. `parameter` names it as the API does, and names `period_end` for an empty or reversed period range. |
 | `PageTokenError` | `APIError` | `400` `invalid_page_token` or `page_token_mismatch` | The API refused a page token ([page tokens](#a-querys-snapshot-and-its-page-tokens)). |
 | `PageTokenExpiredError` | `PageTokenError` | `410 page_token_expired` | The token's snapshot expired. Restart the query. |
